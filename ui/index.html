@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mochy</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app-root">
+    <!-- Top window drag bar -->
+    <div id="window-drag-bar" data-tauri-drag-region></div>
+
+    <!-- Window Controls (Win/Linux) -->
+    <div id="win-linux-controls" class="win-linux-controls hidden">
+      <button id="win-min" title="Minimize">─</button>
+      <button id="win-max" title="Maximize">□</button>
+      <button id="win-close" class="close" title="Close">✕</button>
+    </div>
+
+    <!-- Floating Corner Nav when Sidebar is Minimized -->
+    <div id="floating-corner-nav" class="floating-corner-nav" aria-hidden="true">
+      <button id="corner-home-btn" class="corner-logo-btn" title="Home (⌘1)"></button>
+      <button id="corner-expand-btn" class="corner-restore-btn" title="Expand Sidebar (⌘⌥B)"></button>
+    </div>
+
+    <!-- Main Horizontal Split: Sidebar | MainArea | RightPane -->
+    <div id="shell-split" class="shell-split">
+      <aside id="sidebar" class="sidebar"></aside>
+
+      <main id="main-area" class="main-area">
+        <!-- Floating Top Player Pill -->
+        <div id="top-overlay" class="top-overlay">
+          <div id="top-player-bar" class="top-player-bar"></div>
+        </div>
+
+        <div id="page-stack" class="page-stack">
+          <div id="tab-home" class="tab-page active"></div>
+          <div id="tab-library" class="tab-page"></div>
+          <div id="tab-search" class="tab-page"></div>
+          <div id="route-container" class="route-container hidden"></div>
+          <button id="back-button" class="back-button glass-pill hidden" title="Back (⌘[)"></button>
+        </div>
+
+        <div id="error-toast" class="error-toast glass-pill hidden">
+          <span class="toast-warn">!</span>
+          <span id="error-toast-text"></span>
+          <button id="error-toast-close" class="plain-btn">✕</button>
+        </div>
+      </main>
+
+      <!-- Backdrop for narrow overlay drawer mode -->
+      <div id="right-pane-scrim" class="right-pane-scrim"></div>
+      <!-- Unified Right Pane (Randomize | Repeat | Queue | Lyrics) -->
+      <aside id="right-pane" class="right-pane"></aside>
+    </div>
+
+    <!-- Full Player Overlay -->
+    <div id="full-player" class="full-player hidden"></div>
+
+    <!-- Popovers, Context Menus & Modals -->
+    <div id="popover-layer" class="popover-layer hidden"></div>
+    <div id="context-menu-layer" class="context-menu-layer hidden"></div>
+    <div id="modal-layer" class="modal-layer hidden"></div>
+  </div>
+
+  <script src="js/ambient.js"></script>
+  <script src="js/audiofx.js"></script>
+  <script src="js/transport.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

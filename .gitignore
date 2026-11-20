@@ -1,0 +1,41 @@
+# rust build output, several gigs and rebuilt by cargo
+target/
+
+# tauri regenerates these capability schemas on every build
+src-tauri/gen/schemas/
+
+# unmerged scratch work that stays on this machine
+.build-parts/
+
+# ai assistant notes and settings
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.gemini/
+.codex/
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.aider*
+.continue/
+.copilot/
+.github/copilot-instructions.md
+
+# os junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# local env and logs
+.env
+.env.*
+*.log

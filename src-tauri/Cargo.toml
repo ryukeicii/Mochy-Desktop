@@ -1,0 +1,39 @@
+[package]
+name = "mochy"
+version = "0.1.0"
+description = "Mochy Music — lightweight cross-platform YouTube Music & synced lyrics desktop app"
+authors = ["Mochy"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "custom-protocol"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip"] }
+regex = "1"
+base64 = "0.22"
+roxmltree = "0.20"
+uuid = { version = "1", features = ["v4"] }
+dirs = "5"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+futures-util = "0.3"
+url = "2"
+mdns-sd = "0.21.7"
+flate2 = "1.1.11"
+whoami = "2.1.3"
+rusqlite = { version = "0.42.0", features = ["bundled"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+lofty = "0.25.5"
+tauri-plugin-dialog = "2"
+if-addrs = "0.15"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
