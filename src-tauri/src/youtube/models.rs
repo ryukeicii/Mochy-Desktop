@@ -187,6 +187,23 @@ impl FeedSection {
     }
 }
 
+// one tile on search's moods & genres page: a name, its colour stripe and the page it opens
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoodItem {
+    pub title: String,
+    pub stripe_color: Option<i64>,
+    pub browse_id: String,
+    pub params: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoodSection {
+    pub title: String,
+    pub items: Vec<MoodItem>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HomeChip {
@@ -277,4 +294,6 @@ pub struct StreamInfo {
     pub is_hls: bool,
     pub approx_duration: Option<f64>,
     pub format_label: String,
+    #[serde(skip)]
+    pub patched_init: Option<Vec<u8>>,
 }

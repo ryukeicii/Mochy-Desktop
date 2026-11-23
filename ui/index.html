@@ -7,21 +7,21 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div id="app" class="app-root">
+  <div id="app" class="app-root sidebar-minimized">
     <!-- Top window drag bar -->
     <div id="window-drag-bar" data-tauri-drag-region></div>
 
     <!-- Window Controls (Win/Linux) -->
     <div id="win-linux-controls" class="win-linux-controls hidden">
-      <button id="win-min" title="Minimize">─</button>
-      <button id="win-max" title="Maximize">□</button>
-      <button id="win-close" class="close" title="Close">✕</button>
+      <button id="win-min" title="Minimize"><svg viewBox="0 0 16 16" width="15" height="15"><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button id="win-max" title="Maximize"><svg viewBox="0 0 16 16" width="15" height="15"><rect x="3.3" y="3.3" width="9.4" height="9.4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button id="win-close" class="close" title="Close"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
     </div>
 
-    <!-- Floating Corner Nav when Sidebar is Minimized -->
-    <div id="floating-corner-nav" class="floating-corner-nav" aria-hidden="true">
+    <!-- Logo and sidebar toggle, always in the top-left corner -->
+    <div id="corner-nav" class="corner-nav">
       <button id="corner-home-btn" class="corner-logo-btn" title="Home (⌘1)"></button>
-      <button id="corner-expand-btn" class="corner-restore-btn" title="Expand Sidebar (⌘⌥B)"></button>
+      <button id="sidebar-toggle-btn" class="corner-toggle-btn" title="Show sidebar (⌘⌥B)"></button>
     </div>
 
     <!-- Main Horizontal Split: Sidebar | MainArea | RightPane -->
@@ -51,7 +51,7 @@
 
       <!-- Backdrop for narrow overlay drawer mode -->
       <div id="right-pane-scrim" class="right-pane-scrim"></div>
-      <!-- Unified Right Pane (Randomize | Repeat | Queue | Lyrics) -->
+      <!-- Unified Right Pane (Queue | Lyrics) -->
       <aside id="right-pane" class="right-pane"></aside>
     </div>
 
@@ -68,6 +68,9 @@
   <script src="js/audiofx.js"></script>
   <script src="js/transport.js"></script>
   <script src="js/settings.js"></script>
+  <script src="js/devices.js"></script>
+  <script src="js/remote.js"></script>
+  <script src="js/shelves.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -13,6 +13,9 @@
     ? (ev, cb) => window.__TAURI__.event.listen(ev, (e) => cb(e?.payload))
     : () => {};
 
+  // apple's push and sheet curve, the same one the css calls --ease-ios
+  const IOS_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+
   // --------------------------------------------------------------------------
   // Vector Icons (Exact paths from VectorIcons.swift + UI symbols)
   // --------------------------------------------------------------------------
@@ -46,7 +49,9 @@
     expand: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
     settings: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
     sidebar: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="5.5" y1="9" x2="6.8" y2="9"/><line x1="5.5" y1="12" x2="6.8" y2="12"/></svg>`,
+    chevron: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9.5 6 15.5 12 9.5 18"/></svg>`,
     sidebarExpand: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="12.5" y1="12" x2="17" y2="12"/><line x1="14.75" y1="9.75" x2="17" y2="12"/><line x1="14.75" y1="14.25" x2="17" y2="12"/></svg>`,
+    swap: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v14M4.5 7.5L8 4l3.5 3.5M16 20V6M12.5 16.5L16 20l3.5-3.5"/></svg>`,
     clock: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>`,
     sparkles: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z"/></svg>`,
     pin: `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg>`,
@@ -68,22 +73,21 @@
   const state = {
     proxyPort: 0,
     platform: "macos",
+    userName: "",
     tab: "home", // "home" | "library" | "search"
     routeStack: [],
 
     // Responsive & Pane State
-    userSidebarCollapsed: false,
+    userSidebarCollapsed: true,
     autoSidebarCollapsed: false,
-    sidebarRail: false,
     rightPaneOpen: false,
-    rightPaneTab: "lyrics", // "randomize" | "repeat" | "queue" | "lyrics"
+    rightPaneTab: "lyrics", // "queue" | "lyrics"
     showFullPlayer: false,
     fullPlayerMode: "lyrics",
 
     // Home & Hero State
     homePage: null,
     homeLoading: true,
-    selectedChipTitle: null,
     discoverPicks: [],
     quickPicks: [],
     heroCards: [],
@@ -106,11 +110,16 @@
     },
 
     // Search State
+    searchMode: "browse", // "browse" | "typing" | "results"
     searchQuery: "",
+    searchSubmitted: "",
+    searchSuggest: null,
     searchFilter: null,
     searchSummary: null,
     searchPage: null,
     searchLoading: false,
+    moods: null,
+    moodsLoading: false,
 
     // Library & Settings
     library: {
@@ -130,7 +139,10 @@
         topArtists: []
       }
     },
-    libraryFilter: "all",
+    libraryTab: "all", // "all" | "songs" | "playlists" | "albums" | "artists"
+    libraryQuery: "",
+    libraryExtraSongs: [],
+    libraryExtraKey: null,
     providers: [],
     settings: {
       playerBarStyle: "auto",
@@ -221,7 +233,6 @@
     };
   }
 
-  const HERO_EASE = cubicBezier(0.32, 0, 0.15, 1);
   const GACHA_EASE = cubicBezier(0.15, 0.45, 0.2, 1);
 
   function esc(str) {
@@ -268,6 +279,10 @@
     if (song.source === "local") {
       return `http://127.0.0.1:${state.proxyPort}/local/${encodeURIComponent(song.id)}`;
     }
+    // a song file that lives on a paired phone, streamed from it over the wi-fi
+    if (song.source?.startsWith("link:")) {
+      return `http://127.0.0.1:${state.proxyPort}/link/${encodeURIComponent(song.source.slice(5))}/${encodeURIComponent(song.id)}`;
+    }
     return `http://127.0.0.1:${state.proxyPort}/stream/${encodeURIComponent(song.id)}?t=${Date.now()}`;
   }
 
@@ -286,13 +301,6 @@
 
   function isLiked(songId) {
     return (state.library.likedIds || []).includes(songId);
-  }
-
-  function profileInitials() {
-    const name = (state.settings.profileName || "").trim();
-    if (!name) return "M";
-    const letters = name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
-    return letters ? letters.toUpperCase() : "M";
   }
 
   function showError(msg) {
@@ -315,7 +323,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Audio Engine (Dual-Deck Web Audio DSP + CrossMix + Gacha Sounds)
+  // Audio Engine (Web Audio EQ + Gacha Sounds)
   // --------------------------------------------------------------------------
   const audio = window.MochyAudioFX.createAudioEngine();
   let audioCtx = null;
@@ -393,51 +401,8 @@
       audio.currentTime = 0;
       audio.play().catch(() => {});
     } else {
-      playNext(false);
+      playNext();
     }
-  });
-
-  audio.onCrossmixPrepare(async (fadeSec) => {
-    if (state.repeatMode === "one") return;
-    let targetIdx = -1;
-    if (state.currentIndex + 1 < state.queue.length) targetIdx = state.currentIndex + 1;
-    else if (state.repeatMode === "all" && state.queue.length > 1) targetIdx = 0;
-    if (targetIdx < 0) return;
-
-    const nextSong = state.queue[targetIdx];
-    if (!nextSong) return;
-
-    // Respect gapless album continuity when requested
-    const cm = state.settings.prefs?.audioLab?.crossmix;
-    if (cm?.gapless !== false && state.currentSong?.album?.name && nextSong.album?.name === state.currentSong.album.name) {
-      return;
-    }
-
-    try {
-      const resolved = await resolveSongStream(nextSong);
-      if (!resolved?.url) return;
-      state.currentIndex = targetIdx;
-      state.currentSong = nextSong;
-      state.currentTime = 0;
-      state.duration = resolved.approxDuration || nextSong.duration || 0;
-      state.currentStreamMeta = resolved;
-
-      const thumb = songThumb(nextSong);
-      if (thumb) {
-        fetchCoverPalette(thumb).then((pal) => {
-          if (pal?.stops && state.currentSong?.id === nextSong.id) {
-            state.palette = pal.stops;
-            if (ambientInst) ambientInst.setPalette(pal.stops);
-          }
-        });
-      }
-      loadLyricsForSong(nextSong);
-      await audio.crossfadeIntoNext(resolved.url, fadeSec, resolved.loudnessDb ?? null);
-      renderAllPlayerSurfaces();
-      syncHeroCards();
-      invoke("lib_record_play", { song: nextSong }).then((snap) => { state.library = snap; }).catch(() => {});
-      saveSessionQuiet();
-    } catch (_) {}
   });
 
   audio.addEventListener("error", () => {
@@ -448,7 +413,7 @@
         const timeoutMs = (pb.skipTimeoutSec || 6) * 1000;
         clearTimeout(audio._failSkipTimer);
         audio._failSkipTimer = setTimeout(() => {
-          if (audio.paused) playNext(true);
+          if (audio.paused) playNext();
         }, timeoutMs);
       }
     }
@@ -509,8 +474,10 @@
   // --------------------------------------------------------------------------
   // Playback, Shuffle & Queue Management
   // --------------------------------------------------------------------------
-  async function playSong(song, queueSongs = null, startIndex = 0) {
+  async function playSong(song, queueSongs = null, startIndex = 0, { here = false } = {}) {
     if (!song || !song.id) return;
+    const picked = queueSongs?.length ? queueSongs : [song];
+    if (!here && window.MochyRemote?.playOnRemote(picked, queueSongs?.length ? startIndex : 0)) return;
     ensureAudioContext();
     if (queueSongs && state.settings.prefs?.playback?.keepShuffleOn === false) {
       state.shuffleEnabled = false;
@@ -565,7 +532,7 @@
             }
             state.lyricsBrowseId = res.lyricsBrowseId || null;
             saveSessionQuiet();
-            if (state.rightPaneOpen && ["queue", "randomize", "repeat"].includes(state.rightPaneTab)) {
+            if (state.rightPaneOpen && state.rightPaneTab === "queue") {
               renderRightPane();
             }
           }
@@ -609,6 +576,15 @@
         approxDuration: song.duration || null
       };
     }
+    if (song.source?.startsWith("link:")) {
+      return {
+        url: streamUrl(song),
+        codec: "From your device",
+        formatLabel: "From your device",
+        loudnessDb: null,
+        approxDuration: song.duration || null
+      };
+    }
     const q = state.settings.prefs?.behaviour?.dataSaver
       ? "low"
       : state.settings.audioQuality || "auto";
@@ -624,7 +600,7 @@
     };
   }
 
-  async function loadAndPlayCurrent(autoPlay = true, { isSkip = false } = {}) {
+  async function loadAndPlayCurrent(autoPlay = true) {
     const song = state.queue[state.currentIndex];
     if (!song) return;
     clearTimeout(audio._failSkipTimer);
@@ -633,6 +609,7 @@
     state.currentTime = 0;
     state.duration = song.duration || 0;
     state.isLoadingStream = true;
+    audio.prepareLoad();
     renderAllPlayerSurfaces();
     syncHeroCards();
 
@@ -670,7 +647,6 @@
       audio.setVolume(state.volume, state.isMuted);
       await audio.loadUrl(resolved.url, {
         autoPlay,
-        isSkip,
         loudnessDb: resolved.loudnessDb ?? null
       });
       state.isLoadingStream = false;
@@ -720,14 +696,14 @@
     }
   }
 
-  function playNext(isSkip = true) {
+  function playNext() {
     if (!state.queue.length) return;
     if (state.currentIndex + 1 < state.queue.length) {
       state.currentIndex++;
-      loadAndPlayCurrent(true, { isSkip });
+      loadAndPlayCurrent(true);
     } else if (state.repeatMode === "all") {
       state.currentIndex = 0;
-      loadAndPlayCurrent(true, { isSkip });
+      loadAndPlayCurrent(true);
     }
   }
 
@@ -739,10 +715,10 @@
     }
     if (state.currentIndex > 0) {
       state.currentIndex--;
-      loadAndPlayCurrent(true, { isSkip: true });
+      loadAndPlayCurrent(true);
     } else if (state.repeatMode === "all") {
       state.currentIndex = state.queue.length - 1;
-      loadAndPlayCurrent(true, { isSkip: true });
+      loadAndPlayCurrent(true);
     } else {
       audio.currentTime = 0;
     }
@@ -755,6 +731,7 @@
     audio.currentTime = target;
     state.currentTime = target;
     updateSeekBarsOnly();
+    window.MochyRemote?.reportPlayer();
   }
 
   function setVolume(vol) {
@@ -834,6 +811,10 @@
     }
   }
 
+  // the gacha field drifts slowly at rest, so a few frames a second look the same and leave the scroll alone
+  const GACHA_IDLE_FRAME_MS = 1000 / 15;
+  let gachaFieldDrawnAt = 0;
+
   function tickFrame(ts) {
     if (state.showFullPlayer && ambientInst && !fpMotionLive) {
       ambientInst.render(ts, false);
@@ -851,8 +832,11 @@
       state.tab === "home" &&
       !state.routeStack.length &&
       !state.showFullPlayer &&
-      state.heroScrollProgress < 0.85
+      !heroSwitching &&
+      state.heroScrollProgress < 0.85 &&
+      (state.gacha.phase === "rolling" || state.gacha.burst > 0 || ts - gachaFieldDrawnAt >= GACHA_IDLE_FRAME_MS)
     ) {
+      gachaFieldDrawnAt = ts;
       drawVisibleGachaFields(ts * 0.001);
     }
 
@@ -974,33 +958,104 @@
 
     state.autoSidebarCollapsed = w < 560;
 
-    app.classList.toggle("sidebar-minimized", isSidebarMinimized());
+    const minimized = isSidebarMinimized();
+    app.classList.toggle("sidebar-minimized", minimized);
     app.classList.toggle("right-pane-open", state.rightPaneOpen);
+    const toggle = $("sidebar-toggle-btn");
+    if (toggle) {
+      toggle.innerHTML = minimized ? ICONS.sidebarExpand : ICONS.sidebar;
+      toggle.title = minimized ? "Show sidebar (⌘⌥B)" : "Hide sidebar (⌘⌥B)";
+    }
+    if (!state.rightPaneOpen) $("right-pane")._shownTab = null;
 
     updateVisiblePage();
   }
 
+  // what lines up on the content column, so what the rail pushes over when it opens
+  const CONTENT_COLUMN =
+    ".hero-text, .shelf-head, .shelf-row, .shelf-grid, .search-page-wrap, .library-page-wrap, .detail-header > :not(.detail-header-backdrop), .detail-body";
+
+  // opening the rail pushes the content column over to make room and closing it lets it back; css slides the rail itself
   function toggleSidebar(force) {
-    if (typeof force === "boolean") {
-      state.userSidebarCollapsed = force;
-      if (!force) state.autoSidebarCollapsed = false;
-    } else {
-      if (isSidebarMinimized()) {
-        state.userSidebarCollapsed = false;
-        state.autoSidebarCollapsed = false;
-      } else {
-        state.userSidebarCollapsed = true;
-      }
-    }
+    const collapse = typeof force === "boolean" ? force : !isSidebarMinimized();
+    const columnFrom = contentColumnX();
+    const backFrom = $("back-button").getBoundingClientRect().left;
+    state.userSidebarCollapsed = collapse;
+    if (!collapse) state.autoSidebarCollapsed = false;
     try {
-      localStorage.setItem("mochy.sidebarCollapsed", state.userSidebarCollapsed ? "1" : "0");
+      localStorage.setItem("mochy.sidebarCollapsed", collapse ? "1" : "0");
     } catch (_) {}
     syncShellLayout();
-    renderSidebar();
+    glideContentColumn(columnFrom - contentColumnX(), backFrom);
+  }
+
+  function contentColumnX() {
+    return parseFloat(getComputedStyle($("app")).getPropertyValue("--content-x")) || 0;
+  }
+
+  // the column has already snapped to its new spot; what's on screen glides over from the old one, so nothing lays out per frame
+  function glideContentColumn(dx, backFrom) {
+    if (Math.abs(dx) < 0.5 || reducedMotion()) return;
+    const route = $("route-container");
+    const page = route.classList.contains("hidden") ? document.querySelector(".tab-page.active") : route;
+    const h = window.innerHeight;
+    // a piece inside another piece already rides along with it
+    const pieces = [...(page?.querySelectorAll(CONTENT_COLUMN) || [])].filter((el) => !el.parentElement.closest(CONTENT_COLUMN));
+    const onScreen = pieces.filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.bottom > 0 && r.top < h;
+    });
+    const back = $("back-button");
+    const backDx = back.classList.contains("hidden") ? 0 : backFrom - back.getBoundingClientRect().left;
+    onScreen.forEach((el) => glide(el, dx));
+    glide(back, backDx);
+  }
+
+  // where things sit before the right pane moves: the centred pill, the hero's dots and the hero picture
+  function shellAnchors() {
+    const heroShown = !state.routeStack.length && state.tab === "home" && !heroSwitching;
+    return {
+      pill: $("top-overlay").querySelector(".top-player-pill")?.getBoundingClientRect() || null,
+      dots: heroShown ? $("hero-dots")?.getBoundingClientRect() || null : null,
+      media: heroShown ? $("hero-stage")?.querySelector(".hero-media-wrap")?.getBoundingClientRect() || null : null
+    };
+  }
+
+  // the page has already snapped to its new width; the centred bits glide there from where they were, so nothing lays out per frame
+  function glideShellFrom(before) {
+    if (reducedMotion()) return;
+    const after = shellAnchors();
+    if (before.pill && after.pill) glide($("top-overlay"), centre(before.pill) - centre(after.pill));
+    if (before.dots && after.dots) glide($("hero-dots"), before.dots.left - after.dots.left);
+    // the hero picture is cropped to fit, so it also starts at its old size and settles into the new one
+    if (before.media && after.media && after.media.width > 0) {
+      const media = $("hero-stage").querySelector(".hero-media-wrap");
+      glide(media, centre(before.media) - centre(after.media), before.media.width / after.media.width);
+    }
+  }
+
+  function centre(rect) {
+    return rect.left + rect.width / 2;
+  }
+
+  function glide(el, dx, scale = 1) {
+    if (!el || (Math.abs(dx) < 0.5 && Math.abs(scale - 1) < 0.002)) return;
+    el.animate(
+      [{ transform: `translate3d(${dx.toFixed(1)}px, 0, 0) scale(${scale.toFixed(4)})` }, { transform: "translate3d(0, 0, 0) scale(1)" }],
+      { duration: 520, easing: IOS_EASE }
+    );
+  }
+
+  function closeRightPane() {
+    const before = shellAnchors();
+    state.rightPaneOpen = false;
+    syncShellLayout();
+    renderTopBar();
+    glideShellFrom(before);
   }
 
   // --------------------------------------------------------------------------
-  // Navigation & Page Transitions (Slide + Blur + Zoom)
+  // Navigation & Page Transitions (Slide + Fade)
   // --------------------------------------------------------------------------
   function animateIn(el, kind) {
     if (!el) return;
@@ -1008,7 +1063,7 @@
     void el.offsetWidth;
     el.classList.add(`enter-${kind}`);
     clearTimeout(el._enterTimer);
-    el._enterTimer = setTimeout(() => el.classList.remove(`enter-${kind}`), 520);
+    el._enterTimer = setTimeout(() => el.classList.remove(`enter-${kind}`), 600);
   }
 
   function switchTab(tab) {
@@ -1019,7 +1074,6 @@
     renderSidebar();
     if (tab === "search") {
       renderSearchTab();
-      setTimeout(() => $("search-input")?.focus(), 40);
     } else if (tab === "library") {
       renderLibraryTab();
     } else if (tab === "home") {
@@ -1067,15 +1121,11 @@
     $("tab-search").classList.toggle("active", !hasRoute && state.tab === "search");
     $("route-container").classList.toggle("hidden", !hasRoute);
 
-    const backBtn = $("back-button");
-    backBtn.classList.toggle("hidden", !hasRoute);
-    const min = isSidebarMinimized();
-    backBtn.classList.toggle("shifted-for-traffic", state.platform === "macos" && min);
-    backBtn.classList.toggle("shifted-for-corner", state.platform !== "macos" && min);
+    $("back-button").classList.toggle("hidden", !hasRoute);
   }
 
   // --------------------------------------------------------------------------
-  // Sidebar (Logo -> Home/Library/Search -> Divider -> User Playlists -> Divider -> Minimize + Profile)
+  // Sidebar (Home/Library/Search -> Divider -> User Playlists -> Divider -> Profile), under the corner's logo and toggle
   // --------------------------------------------------------------------------
   function renderSidebar() {
     const sidebar = $("sidebar");
@@ -1092,14 +1142,8 @@
       return 0;
     });
 
-    const profileName = (state.settings.profileName || "").trim();
-
     sidebar.innerHTML = `
       <div class="sidebar-inner">
-        <button class="sidebar-brand" id="sidebar-brand-btn" title="Mochy — Home">
-          ${ICONS.mochy}
-        </button>
-
         <nav class="sidebar-nav">
           <button class="sidebar-row ${isHome ? "selected" : ""}" data-nav="home" title="Home (⌘1)">
             <span class="sidebar-icon">${isHome ? ICONS.homeFilled : ICONS.home}</span>
@@ -1135,10 +1179,7 @@
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-footer">
-          <button class="sidebar-row" id="sidebar-collapse-btn" title="Minimize Pane (⌘⌥B)">
-            <span class="sidebar-icon">${ICONS.sidebar}</span>
-          </button>
-          <button class="sidebar-row" id="sidebar-profile-btn" title="${esc(profileName || "Profile & Settings")}">
+          <button class="sidebar-row" id="sidebar-profile-btn" title="Settings">
             <span class="sidebar-profile-avatar">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="12" cy="8.5" r="3.6"/><path d="M5.5 19.5c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
             </span>
@@ -1147,7 +1188,6 @@
       </div>
     `;
 
-    $("sidebar-brand-btn").onclick = () => switchTab("home");
     sidebar.querySelectorAll("[data-nav]").forEach((btn) => {
       btn.onclick = () => switchTab(btn.dataset.nav);
     });
@@ -1169,21 +1209,7 @@
     const newRailBtn = $("sidebar-new-rail-btn");
     if (newRailBtn) newRailBtn.onclick = () => promptNewPlaylist();
 
-    $("sidebar-collapse-btn").onclick = () => toggleSidebar(true);
     $("sidebar-profile-btn").onclick = (e) => openProfileMenu(e.currentTarget.getBoundingClientRect());
-
-    const cornerHome = $("corner-home-btn");
-    const cornerExpand = $("corner-expand-btn");
-    if (cornerHome && !cornerHome.dataset.bound) {
-      cornerHome.innerHTML = ICONS.mochy;
-      cornerHome.onclick = () => switchTab("home");
-      cornerHome.dataset.bound = "1";
-    }
-    if (cornerExpand && !cornerExpand.dataset.bound) {
-      cornerExpand.innerHTML = ICONS.sidebarExpand;
-      cornerExpand.onclick = () => toggleSidebar(false);
-      cornerExpand.dataset.bound = "1";
-    }
   }
 
   // the three transport buttons move the same everywhere, and their glyphs outlive a re-render of the bar
@@ -1210,7 +1236,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Top Floating Player Pill (Cover+Title | Prev Play Next | Randomize Repeat Queue Lyrics)
+  // Top Floating Player Pill (Cover+Title | Prev Play Next | Shuffle Repeat Queue Lyrics)
   // --------------------------------------------------------------------------
   function renderTopBar() {
     const bar = $("top-player-bar");
@@ -1245,10 +1271,10 @@
         <div class="top-pill-sep"></div>
 
         <div class="top-pill-group">
-          <button class="top-icon-btn ${state.shuffleEnabled ? "mode-on" : ""} ${rpActive("randomize")}" id="top-randomize-btn" title="Randomize (⌘⌥S)">
+          <button class="top-icon-btn ${state.shuffleEnabled ? "mode-on" : ""}" id="top-randomize-btn" title="Shuffle (⌘⌥S)">
             ${ICONS.shuffle}
           </button>
-          <button class="top-icon-btn ${state.repeatMode !== "off" ? "mode-on" : ""} ${rpActive("repeat")}" id="top-repeat-btn" title="Repeat (⌘R)">
+          <button class="top-icon-btn ${state.repeatMode !== "off" ? "mode-on" : ""}" id="top-repeat-btn" title="Repeat (⌘R)">
             ${repeatIcon}
           </button>
           <button class="top-icon-btn ${rpActive("queue")}" id="top-queue-btn" title="Queue">
@@ -1273,72 +1299,61 @@
     };
     mountTransport("top", $("top-prev-btn"), $("top-play-btn"), $("top-next-btn"));
 
-    // All 4 buttons after the separator show in the right pane when tapped
-    $("top-randomize-btn").onclick = () => onRightPaneButtonTap("randomize");
-    $("top-repeat-btn").onclick = () => onRightPaneButtonTap("repeat");
+    // shuffle and repeat just switch the mode; queue and lyrics open their page in the pane
+    $("top-randomize-btn").onclick = () => toggleShuffleMode();
+    $("top-repeat-btn").onclick = () => cycleRepeatMode();
     $("top-queue-btn").onclick = () => onRightPaneButtonTap("queue");
     $("top-lyrics-btn").onclick = () => onRightPaneButtonTap("lyrics");
 
     bindSliderDrag($("top-seek-track"), (frac) => seekToFraction(frac));
   }
 
+  function toggleShuffleMode() {
+    applyShuffleState(!state.shuffleEnabled, true);
+    renderAllPlayerSurfaces();
+  }
+
+  function cycleRepeatMode() {
+    state.repeatMode = state.repeatMode === "off" ? "all" : state.repeatMode === "all" ? "one" : "off";
+    renderAllPlayerSurfaces();
+  }
+
+  // the pill's queue and lyrics buttons open their page in the pane, or close it when it's already showing
   function onRightPaneButtonTap(tab) {
-    if (tab === "randomize") {
-      applyShuffleState(!state.shuffleEnabled, true);
-      state.rightPaneTab = "randomize";
+    const before = shellAnchors();
+    if (state.rightPaneOpen && state.rightPaneTab === tab) {
+      state.rightPaneOpen = false;
+    } else {
+      state.rightPaneTab = tab;
       state.rightPaneOpen = true;
-    } else if (tab === "repeat") {
-      state.repeatMode = state.repeatMode === "off" ? "all" : state.repeatMode === "all" ? "one" : "off";
-      state.rightPaneTab = "repeat";
-      state.rightPaneOpen = true;
-    } else if (tab === "queue") {
-      if (state.rightPaneOpen && state.rightPaneTab === "queue") {
-        state.rightPaneOpen = false;
-      } else {
-        state.rightPaneTab = "queue";
-        state.rightPaneOpen = true;
-      }
-    } else if (tab === "lyrics") {
-      if (state.rightPaneOpen && state.rightPaneTab === "lyrics") {
-        state.rightPaneOpen = false;
-      } else {
-        state.rightPaneTab = "lyrics";
-        state.rightPaneOpen = true;
-      }
-      state.settings.lyricsOpen = state.rightPaneOpen;
-      invoke("settings_update", { settings: state.settings }).catch(() => {});
     }
+    state.settings.lyricsOpen = state.rightPaneOpen && state.rightPaneTab === "lyrics";
+    invoke("settings_update", { settings: state.settings }).catch(() => {});
 
     syncShellLayout();
     renderTopBar();
     renderRightPane();
+    glideShellFrom(before);
     if (state.showFullPlayer) renderFullPlayer();
   }
 
   // --------------------------------------------------------------------------
-  // Unified Right Pane (Randomize | Repeat | Queue | Lyrics)
+  // Unified Right Pane (Queue | Lyrics)
   // --------------------------------------------------------------------------
   function renderRightPane() {
     const pane = $("right-pane");
     if (!pane) return;
     if (!state.rightPaneOpen) return;
 
-    const tab = state.rightPaneTab;
-    const titles = {
-      randomize: "Randomize",
-      repeat: "Repeat",
-      queue: "Up Next",
-      lyrics: "Lyrics"
-    };
-
-    const repeatIcon = state.repeatMode === "one" ? ICONS.repeatOne : ICONS.repeat;
+    const tab = state.rightPaneTab === "queue" ? "queue" : "lyrics";
+    // the body slides in when the pane opens or changes page, not on every refresh like play and pause
+    const entering = pane._shownTab !== tab;
+    pane._shownTab = tab;
 
     pane.innerHTML = `
       <div class="right-pane-inner">
         <div class="right-pane-header">
           <div class="right-pane-tabs">
-            <button class="rp-tab-btn ${tab === "randomize" ? "active" : ""}" data-rp-tab="randomize" title="Randomize">${ICONS.shuffle}</button>
-            <button class="rp-tab-btn ${tab === "repeat" ? "active" : ""}" data-rp-tab="repeat" title="Repeat">${repeatIcon}</button>
             <button class="rp-tab-btn ${tab === "queue" ? "active" : ""}" data-rp-tab="queue" title="Queue">${ICONS.queue}</button>
             <button class="rp-tab-btn ${tab === "lyrics" ? "active" : ""}" data-rp-tab="lyrics" title="Lyrics">${ICONS.lyrics}</button>
           </div>
@@ -1353,18 +1368,12 @@
         </div>
 
         <div class="right-pane-subbar">
-          <span class="right-pane-heading">${esc(titles[tab] || "")}</span>
-          ${
-            tab === "lyrics" && state.currentSong
-              ? `<button class="lyrics-source-pill" id="rp-lyrics-picker-btn"><span>${esc(state.currentLyrics?.providerName || "Lyrics")}</span></button>`
-              : tab === "queue" && state.queue.length > 1
-              ? `<button class="lyrics-source-pill" id="rp-clear-queue-btn">Clear</button>`
-              : ""
-          }
+          <span class="right-pane-heading">${tab === "queue" ? "Up Next" : "Lyrics"}</span>
+          ${tab === "queue" && state.queue.length > 1 ? `<button class="lyrics-source-pill" id="rp-clear-queue-btn">Clear</button>` : ""}
         </div>
 
-        <div class="right-pane-body" id="rp-body">
-          ${buildRightPaneBodyHtml(tab)}
+        <div class="right-pane-body ${entering ? "entering" : ""}" id="rp-body">
+          ${tab === "lyrics" ? buildSyncedLyricsBodyHtml(false) : buildQueueBodyHtml()}
         </div>
       </div>
     `;
@@ -1377,17 +1386,10 @@
       };
     });
 
-    $("rp-close-btn").onclick = () => {
-      state.rightPaneOpen = false;
-      syncShellLayout();
-      renderTopBar();
-    };
+    $("rp-close-btn").onclick = () => closeRightPane();
 
     const exp = $("rp-expand-player");
     if (exp) exp.onclick = () => toggleFullPlayer();
-
-    const lyrPick = $("rp-lyrics-picker-btn");
-    if (lyrPick) lyrPick.onclick = (e) => openLyricsPickerPopover(e.currentTarget.getBoundingClientRect());
 
     const clrQ = $("rp-clear-queue-btn");
     if (clrQ) {
@@ -1399,137 +1401,51 @@
       };
     }
 
-    bindRightPaneBodyEvents(pane, tab);
+    if (tab === "lyrics") bindLyricsSeekEvents(pane);
+    else bindQueueBodyEvents(pane);
   }
 
-  function buildRightPaneBodyHtml(tab) {
+  function buildQueueBodyHtml() {
     const song = state.currentSong;
     const upNext = state.queue
       .map((s, idx) => ({ song: s, idx }))
       .filter((it) => it.idx > state.currentIndex);
 
-    if (tab === "lyrics") {
-      return buildSyncedLyricsBodyHtml(false);
-    }
-
-    if (tab === "queue") {
-      return `
-        <div class="rp-scroll">
-          ${
-            song
-              ? `
-            <div class="rp-card rp-now-card">
-              <div class="rp-now-art">${songThumb(song) ? `<img src="${esc(proxyImg(sizedCover(songThumb(song), 120)))}" alt="" />` : ""}</div>
-              <div class="rp-now-meta">
-                <div class="rp-now-kicker">Now Playing</div>
-                <div class="rp-now-title">${esc(song.title)}</div>
-                <div class="rp-now-artist">${esc(artistNames(song))}</div>
-              </div>
-              <button class="top-icon-btn ${isLiked(song.id) ? "mode-on" : ""}" id="rp-now-like" style="color:${isLiked(song.id) ? "#ff375f" : "var(--text-secondary)"}" title="Like">
-                ${isLiked(song.id) ? ICONS.heartFilled : ICONS.heart}
-              </button>
-            </div>`
-              : `<div style="padding:28px 10px;color:var(--text-tertiary);text-align:center;">Nothing playing yet.</div>`
-          }
-
-          <div class="rp-list-label">
-            <span>Up Next</span>
-            <span>${upNext.length ? `${upNext.length} tracks` : ""}</span>
-          </div>
-          ${
-            upNext.length
-              ? upNext
-                  .map(({ song: s, idx }) => renderSongRowHtml(s, { index: idx, listId: "rpQueue", removable: true }))
-                  .join("")
-              : `<div style="padding:24px 8px;color:var(--text-tertiary);text-align:center;">No upcoming tracks in queue.</div>`
-          }
-        </div>
-      `;
-    }
-
-    if (tab === "randomize") {
-      const poolCount = extractHeroPool().length;
-      return `
-        <div class="rp-scroll">
-          <div class="rp-mode-grid">
-            <button class="rp-mode-option ${state.shuffleEnabled ? "active" : ""}" id="rp-toggle-shuffle">
-              <span class="rp-mode-icon">${ICONS.shuffle}</span>
-              <span class="rp-mode-text">
-                <div class="rp-mode-title">Shuffle ${state.shuffleEnabled ? "On" : "Off"}</div>
-                <div class="rp-mode-desc">${state.shuffleEnabled ? "Upcoming tracks are randomized" : "Tap to randomize upcoming tracks"}</div>
-              </span>
+    return `
+      <div class="rp-scroll">
+        ${
+          song
+            ? `
+          <div class="rp-card rp-now-card">
+            <div class="rp-now-art">${songThumb(song) ? `<img src="${esc(proxyImg(sizedCover(songThumb(song), 120)))}" alt="" />` : ""}</div>
+            <div class="rp-now-meta">
+              <div class="rp-now-kicker">Now Playing</div>
+              <div class="rp-now-title">${esc(song.title)}</div>
+              <div class="rp-now-artist">${esc(artistNames(song))}</div>
+            </div>
+            <button class="top-icon-btn" id="rp-now-like" style="color:${isLiked(song.id) ? "#fff" : "var(--text-secondary)"}" title="Like">
+              ${isLiked(song.id) ? ICONS.heartFilled : ICONS.heart}
             </button>
-          </div>
+          </div>`
+            : `<div style="padding:28px 10px;color:var(--text-tertiary);text-align:center;">Nothing playing yet.</div>`
+        }
 
-          <div class="rp-action-row">
-            <button class="pill-action-btn secondary" id="rp-reshuffle-btn">${ICONS.shuffle}<span>Reshuffle</span></button>
-            ${
-              poolCount >= 2
-                ? `<button class="pill-action-btn primary" id="rp-gacha-btn">${ICONS.sparkles}<span>Roll Random</span></button>`
-                : ""
-            }
-          </div>
-
-          <div class="rp-list-label">
-            <span>${state.shuffleEnabled ? "Shuffled Up Next" : "Queue Order"}</span>
-            <span>${upNext.length ? `${upNext.length} tracks` : ""}</span>
-          </div>
-          ${
-            upNext.length
-              ? upNext.map(({ song: s, idx }) => renderSongRowHtml(s, { index: idx, listId: "rpQueue" })).join("")
-              : `<div style="padding:24px 8px;color:var(--text-tertiary);text-align:center;">Play a song or playlist to shuffle upcoming tracks.</div>`
-          }
+        <div class="rp-list-label">
+          <span>Up Next</span>
+          <span>${upNext.length ? `${upNext.length} tracks` : ""}</span>
         </div>
-      `;
-    }
-
-    if (tab === "repeat") {
-      const modes = [
-        { id: "off", title: "Repeat Off", desc: "Stop once the queue finishes", icon: ICONS.repeat },
-        { id: "all", title: "Repeat Queue", desc: "Loop all songs in your queue", icon: ICONS.repeat },
-        { id: "one", title: "Repeat Track", desc: "Loop the current song continuously", icon: ICONS.repeatOne }
-      ];
-      return `
-        <div class="rp-scroll">
-          <div class="rp-mode-grid">
-            ${modes
-              .map(
-                (m) => `
-              <button class="rp-mode-option ${state.repeatMode === m.id ? "active" : ""}" data-set-repeat="${m.id}">
-                <span class="rp-mode-icon">${m.icon}</span>
-                <span class="rp-mode-text">
-                  <div class="rp-mode-title">${m.title}</div>
-                  <div class="rp-mode-desc">${m.desc}</div>
-                </span>
-              </button>`
-              )
-              .join("")}
-          </div>
-
-          ${
-            state.repeatMode === "one" && song
-              ? `
-            <div class="rp-list-label"><span>Looping Track</span></div>
-            ${renderSongRowHtml(song, { index: state.currentIndex, listId: "rpQueue" })}`
-              : state.repeatMode === "all" && state.queue.length
-              ? `
-            <div class="rp-list-label"><span>Looping Queue</span><span>${state.queue.length} tracks</span></div>
-            ${state.queue.map((s, idx) => renderSongRowHtml(s, { index: idx, listId: "rpQueue" })).join("")}`
-              : ""
-          }
-        </div>
-      `;
-    }
-
-    return "";
+        ${
+          upNext.length
+            ? upNext
+                .map(({ song: s, idx }) => renderSongRowHtml(s, { index: idx, listId: "rpQueue", removable: true }))
+                .join("")
+            : `<div style="padding:24px 8px;color:var(--text-tertiary);text-align:center;">No upcoming tracks in queue.</div>`
+        }
+      </div>
+    `;
   }
 
-  function bindRightPaneBodyEvents(pane, tab) {
-    if (tab === "lyrics") {
-      bindLyricsSeekEvents(pane);
-      return;
-    }
-
+  function bindQueueBodyEvents(pane) {
     const nowLike = $("rp-now-like");
     if (nowLike && state.currentSong) {
       nowLike.onclick = async () => {
@@ -1539,44 +1455,6 @@
       };
     }
 
-    const shufBtn = $("rp-toggle-shuffle");
-    if (shufBtn) {
-      shufBtn.onclick = () => {
-        applyShuffleState(!state.shuffleEnabled, true);
-        renderAllPlayerSurfaces();
-      };
-    }
-
-    const reshufBtn = $("rp-reshuffle-btn");
-    if (reshufBtn) {
-      reshufBtn.onclick = () => {
-        applyShuffleState(true, true);
-        renderAllPlayerSurfaces();
-      };
-    }
-
-    const gachaBtn = $("rp-gacha-btn");
-    if (gachaBtn) {
-      gachaBtn.onclick = () => {
-        if (state.tab !== "home" || state.routeStack.length) switchTab("home");
-        const gIdx = state.heroCards.findIndex((c) => c.isGacha);
-        if (gIdx >= 0) {
-          goToHeroCard(gIdx, true);
-          setTimeout(() => startGachaRoll(), 320);
-        } else {
-          const pool = extractHeroPool();
-          if (pool.length) playSong(pool[Math.floor(Math.random() * pool.length)]);
-        }
-      };
-    }
-
-    pane.querySelectorAll("[data-set-repeat]").forEach((btn) => {
-      btn.onclick = () => {
-        state.repeatMode = btn.dataset.setRepeat;
-        renderAllPlayerSurfaces();
-      };
-    });
-
     pane.querySelectorAll("[data-remove-qidx]").forEach((btn) => {
       btn.onclick = (e) => {
         e.stopPropagation();
@@ -1585,6 +1463,7 @@
           const removed = state.queue.splice(idx, 1)[0];
           state.unshuffledQueue = state.unshuffledQueue.filter((s) => s.id !== removed?.id);
           renderRightPane();
+          window.MochyRemote?.reportPlayer();
         }
       };
     });
@@ -1702,21 +1581,16 @@
     const gachaPool = extractHeroPool();
     const recent = state.library.recentSongs || [];
     const lastPlayed = state.currentSong || recent[0] || null;
-    const profileName = (state.settings.profileName || "").trim();
 
     if (lastPlayed) {
       shown.add(lastPlayed.id);
+      // the first card says hello, with the song to pick back up on the line under it
       cards.push({
         id: `song-${lastPlayed.id}`,
         kind: "nowPlaying",
-        label: {
-          text: state.isPlaying && state.currentSong?.id === lastPlayed.id
-            ? "Now playing"
-            : profileName
-            ? `Hello, ${profileName} · Continue`
-            : "Continue"
-        },
-        title: artistNames(lastPlayed) ? `${lastPlayed.title} - ${artistNames(lastPlayed)}` : lastPlayed.title,
+        greeting: true,
+        label: { text: "Continue", subject: lastPlayed.title },
+        title: heroGreeting(),
         thumbnail: songThumb(lastPlayed),
         mediaId: lastPlayed.id,
         opensPage: false,
@@ -1870,11 +1744,20 @@
   }
 
   // --------------------------------------------------------------------------
-  // Hero Carousel Transition Engine (Feathered Wipe + Blur + Zoom + Parallax Drift)
+  // Hero Carousel Transition Engine (Feathered Wipe + Soft Cover + Zoom + Parallax Drift)
   // --------------------------------------------------------------------------
-  let heroAnimRaf = null;
+  const HERO_SLIDE_MS = 1150;
+  const HERO_SLIDE_EASING = "cubic-bezier(0.32, 0, 0.15, 1)";
+  const HERO_FEATHER = 0.55;
+  const SOFT_COVER_PX = 40;
+  const SOFT_COVER_TAPS = [[0, 0], [1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3], [0.9, 0.9], [-0.9, 0.9], [0.9, -0.9], [-0.9, -0.9]];
+  const SOFT_COVER_CACHE_MAX = 40;
+  const HERO_READY_WAIT_MS = 450;
+  const softCovers = new Map();
   let heroAutoTimer = null;
   let heroSwitching = false;
+  let heroSlide = null;
+  let heroSlideTicket = 0;
 
   function syncHeroCards() {
     const nextCards = buildHeroCards();
@@ -1898,20 +1781,25 @@
     if (prevIds !== nextIds || !stage.children.length) {
       renderSettledHeroPage();
       renderHeroDots();
-      preloadNextHeroCover();
+      preloadHeroCovers();
       scheduleHeroAutoAdvance();
     } else {
       updateSettledHeroTextAndState();
     }
   }
 
-  function preloadNextHeroCover() {
-    if (state.heroCards.length <= 1) return;
-    const next = state.heroCards[(state.heroIndex + 1) % state.heroCards.length];
-    if (next?.thumbnail) {
+  // warms what a slide may need next: every card's soft copy (tiny) and the sharp covers either side, decoded
+  function preloadHeroCovers() {
+    const cards = state.heroCards;
+    cards.forEach((c) => c.thumbnail && softCover(proxyImg(sizedCover(c.thumbnail, 120))));
+    if (cards.length <= 1) return;
+    [1, -1].forEach((step) => {
+      const card = cards[(state.heroIndex + step + cards.length) % cards.length];
+      if (!card?.thumbnail) return;
       const img = new Image();
-      img.src = proxyImg(sizedCover(next.thumbnail, 1200));
-    }
+      img.src = proxyImg(sizedCover(card.thumbnail, 1200));
+      img.decode().catch(() => {});
+    });
   }
 
   function isCardPlaying(card) {
@@ -1924,12 +1812,14 @@
 
     if (!card) {
       page.innerHTML = `
-        <div class="quiet-hero"></div>
-        <div class="hero-scrim"></div>
-        <div class="hero-text-layer">
-          <div class="hero-text">
-            <div class="hero-label-line"><span class="hero-label-reason">Nothing here yet</span></div>
-            <h1 class="hero-title">Play something and it shows up here</h1>
+        <div class="hero-page-body">
+          <div class="quiet-hero"></div>
+          <div class="hero-scrim"></div>
+          <div class="hero-text-layer">
+            <div class="hero-text">
+              <div class="hero-label-line"><span class="hero-label-reason">Nothing here yet</span></div>
+              <h1 class="hero-title">Play something and it shows up here</h1>
+            </div>
           </div>
         </div>
       `;
@@ -1950,23 +1840,26 @@
           : result.title;
 
       page.innerHTML = `
-        <div class="hero-media-wrap gacha-media-wrap">
-          <canvas class="gacha-field-canvas"></canvas>
-          <div class="gacha-reel-wrap"></div>
-          <div class="gacha-shading"></div>
-          <div class="gacha-pointer">${ICONS.pointer}</div>
-        </div>
-        <div class="hero-text-layer">
-          <div class="hero-text">
-            <div class="hero-label-line">
-              <span class="hero-label-reason">${esc(lbl)}</span>
-            </div>
-            <h1 class="hero-title">${esc(title)}</h1>
-            <div class="hero-cta-row">
-              <button class="hero-pill-btn" data-hero-action="1" ${rolling ? "disabled" : ""}>
-                ${ICONS.gachaDie(rolling)}
-                <span>${rolling ? "rolling!!" : "roll!!"}</span>
-              </button>
+        <div class="hero-page-body">
+          <div class="hero-media-wrap gacha-media-wrap">
+            <canvas class="gacha-field-canvas"></canvas>
+            <div class="gacha-reel-wrap"></div>
+            <div class="gacha-blur-band"></div>
+            <div class="gacha-shading"></div>
+            <div class="gacha-pointer">${ICONS.pointer}</div>
+          </div>
+          <div class="hero-text-layer">
+            <div class="hero-text">
+              <div class="hero-label-line">
+                <span class="hero-label-reason">${esc(lbl)}</span>
+              </div>
+              <h1 class="hero-title">${esc(title)}</h1>
+              <div class="hero-cta-row">
+                <button class="hero-pill-btn" data-hero-action="1" ${rolling ? "disabled" : ""}>
+                  ${ICONS.gachaDie(rolling)}
+                  <span>${rolling ? "rolling!!" : "roll!!"}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1979,55 +1872,127 @@
 
     const playing = isCardPlaying(card);
     const coverUrl = card.thumbnail ? proxyImg(sizedCover(card.thumbnail, 1200)) : "";
-    const labelText = playing ? "Now playing" : card.label.text;
+    const labelLine = `<div class="hero-label-line ${card.greeting ? "hero-subline" : ""}">${heroLabelHtml(card, playing)}</div>`;
+    const titleLine = `<h1 class="hero-title">${esc(card.title)}</h1>`;
     const pillIcon = card.opensPage ? "" : playing ? ICONS.pause : ICONS.play;
     const pillWord = card.opensPage ? "View" : playing ? "Pause" : "Play";
     const pillAfter = card.opensPage ? ICONS.arrowRight : "";
 
+    const smallUrl = card.thumbnail ? proxyImg(sizedCover(card.thumbnail, 120)) : "";
     page.innerHTML = `
-      <div class="hero-media-wrap">
-        ${
-          coverUrl
-            ? `<img class="hero-cover-veil" src="${esc(proxyImg(sizedCover(card.thumbnail, 160)))}" alt="" />
-               <img class="hero-cover-img" src="${esc(coverUrl)}" alt="" />
-               <img class="hero-cover-blur-edges" src="${esc(proxyImg(sizedCover(card.thumbnail, 160)))}" alt="" />`
-            : `<div class="quiet-hero"></div>`
-        }
-      </div>
-      <div class="hero-scrim"></div>
-      <div class="hero-text-layer">
-        <div class="hero-text">
-          <div class="hero-label-line">
-            <span class="hero-label-reason">
-              ${playing ? playingBarsHtml(true) : ""}
-              <span>${esc(labelText)}</span>
-            </span>
-            ${
-              !playing && card.label.cover
-                ? `<img class="hero-label-cover ${card.label.roundCover ? "round" : ""}" src="${esc(proxyImg(sizedCover(card.label.cover, 80)))}" alt="" />`
-                : ""
-            }
-            ${!playing && card.label.subject ? `<span class="hero-label-subject">${esc(card.label.subject)}</span>` : ""}
-          </div>
-          <h1 class="hero-title">${esc(card.title)}</h1>
-          <div class="hero-cta-row">
-            <button class="hero-pill-btn" data-hero-action="1">
-              ${pillIcon}
-              <span>${pillWord}</span>
-              ${pillAfter}
-            </button>
+      <div class="hero-page-body">
+        <div class="hero-media-wrap">
+          ${
+            coverUrl
+              ? `<canvas class="hero-soft hero-cover-veil"></canvas>
+                 <img class="hero-cover-img" src="${esc(coverUrl)}" alt="" />
+                 <canvas class="hero-soft hero-cover-blur-edges"></canvas>`
+              : `<div class="quiet-hero"></div>`
+          }
+        </div>
+        <div class="hero-scrim"></div>
+        <div class="hero-text-layer">
+          <div class="hero-text">
+            ${card.greeting ? titleLine + labelLine : labelLine + titleLine}
+            <div class="hero-cta-row">
+              <button class="hero-pill-btn" data-hero-action="1">
+                ${pillIcon}
+                <span>${pillWord}</span>
+                ${pillAfter}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     `;
 
     page.querySelector("[data-hero-action]").onclick = () => activateHeroCard(card);
+    page._softReady = paintSoftCover(page.querySelectorAll(".hero-soft"), smallUrl);
     return page;
+  }
+
+  // the line beside the title: why this card is here, or what's playing; the hello card keeps its song name while playing
+  function heroLabelHtml(card, playing) {
+    const subject = card.label.subject && (card.greeting || !playing) ? card.label.subject : "";
+    return `
+      <span class="hero-label-reason">
+        ${playing ? playingBarsHtml(true) : ""}
+        <span>${esc(playing ? "Now playing" : card.label.text)}</span>
+      </span>
+      ${
+        !playing && card.label.cover
+          ? `<img class="hero-label-cover ${card.label.roundCover ? "round" : ""}" src="${esc(proxyImg(sizedCover(card.label.cover, 80)))}" alt="" />`
+          : ""
+      }
+      ${subject ? `<span class="hero-label-subject">${esc(subject)}</span>` : ""}
+    `;
+  }
+
+  // "Hello, Roo" from the profile name or this computer's account, or a plain welcome when neither has one
+  function heroGreeting() {
+    const name = (state.settings.profileName || state.userName || "").trim();
+    return name ? `Hello, ${name}` : "Welcome back";
+  }
+
+  // the cover's blurred copy, made once per cover: a tiny image drawn a few times nudged around, which css then stretches
+  function softCover(url) {
+    let made = softCovers.get(url);
+    if (made) return made;
+    made = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = SOFT_COVER_PX;
+        // the cover keeps its own shape, so a wide video frame crops the same way as the sharp picture over it
+        const h = Math.max(1, Math.round((SOFT_COVER_PX * img.naturalHeight) / Math.max(1, img.naturalWidth)));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        // each nudged copy is blended in at 1/n, so together they average out into a soft blur
+        SOFT_COVER_TAPS.forEach(([dx, dy], i) => {
+          ctx.globalAlpha = 1 / (i + 1);
+          ctx.drawImage(img, dx - 2, dy - 2, w + 4, h + 4);
+        });
+        resolve(canvas);
+      };
+      img.onerror = () => {
+        softCovers.delete(url);
+        resolve(null);
+      };
+      img.src = url;
+    });
+    softCovers.set(url, made);
+    if (softCovers.size > SOFT_COVER_CACHE_MAX) softCovers.delete(softCovers.keys().next().value);
+    return made;
+  }
+
+  // copies the cached soft cover into a page's canvases; the promise settles once they're painted
+  function paintSoftCover(canvases, url) {
+    if (!url || !canvases.length) return Promise.resolve();
+    return softCover(url).then((src) => {
+      if (!src) return;
+      canvases.forEach((canvas) => {
+        canvas.width = src.width;
+        canvas.height = src.height;
+        canvas.getContext("2d").drawImage(src, 0, 0);
+      });
+    });
+  }
+
+  // waits a moment for a new page's covers, so a slide never wipes in an empty page whose scrim only darkens the old one
+  function heroPageReady(page) {
+    const sharp = page.querySelector(".hero-cover-img");
+    const ready = Promise.all([page._softReady, sharp?.decode().catch(() => {})]);
+    return Promise.race([ready, new Promise((resolve) => setTimeout(resolve, HERO_READY_WAIT_MS))]);
   }
 
   function renderSettledHeroPage() {
     const stage = $("hero-stage");
     if (!stage) return;
+    finishHeroSlide();
+    // a slide still waiting on its covers is dropped, this page replaces it
+    heroSlideTicket++;
+    heroSwitching = false;
     stage.innerHTML = "";
     const card = state.heroCards[state.heroIndex] || null;
     stage.appendChild(buildHeroPageElement(card));
@@ -2067,21 +2032,7 @@
     const playing = isCardPlaying(card);
     const labelLine = page.querySelector(".hero-label-line");
     const btnEl = page.querySelector("[data-hero-action]");
-    if (labelLine) {
-      const labelText = playing ? "Now playing" : card.label.text;
-      labelLine.innerHTML = `
-        <span class="hero-label-reason">
-          ${playing ? playingBarsHtml(true) : ""}
-          <span>${esc(labelText)}</span>
-        </span>
-        ${
-          !playing && card.label.cover
-            ? `<img class="hero-label-cover ${card.label.roundCover ? "round" : ""}" src="${esc(proxyImg(sizedCover(card.label.cover, 80)))}" alt="" />`
-            : ""
-        }
-        ${!playing && card.label.subject ? `<span class="hero-label-subject">${esc(card.label.subject)}</span>` : ""}
-      `;
-    }
+    if (labelLine) labelLine.innerHTML = heroLabelHtml(card, playing);
     if (btnEl) {
       const pillIcon = card.opensPage ? "" : playing ? ICONS.pause : ICONS.play;
       const pillWord = card.opensPage ? "View" : playing ? "Pause" : "Play";
@@ -2105,148 +2056,155 @@
       )
       .join("");
     dots.querySelectorAll("[data-hero-dot]").forEach((btn) => {
-      btn.onclick = () => goToHeroCard(Number(btn.dataset.heroDot), false);
+      btn.onclick = () => goToHeroCard(Number(btn.dataset.heroDot));
     });
   }
 
-  function stepHeroCard(delta, curved = false) {
+  function stepHeroCard(delta) {
     const count = state.heroCards.length;
     if (count <= 1) return;
     if (state.gacha.phase === "rolling" && state.heroCards[state.heroIndex]?.isGacha) return;
     const to = (state.heroIndex + delta + count) % count;
-    transitionHeroPage(state.heroIndex, to, delta > 0, curved);
+    transitionHeroPage(state.heroIndex, to, delta > 0);
   }
 
-  function goToHeroCard(toIndex, curved = false) {
+  function goToHeroCard(toIndex) {
     const count = state.heroCards.length;
     if (count <= 1 || toIndex === state.heroIndex) return;
     if (state.gacha.phase === "rolling" && state.heroCards[state.heroIndex]?.isGacha) return;
-    const forward = toIndex > state.heroIndex;
-    transitionHeroPage(state.heroIndex, toIndex, forward, curved);
+    transitionHeroPage(state.heroIndex, toIndex, toIndex > state.heroIndex);
   }
 
-  // Exact PageWipe + pageMediaDrift + pageTextDrift + switchBlur from HomeHero.swift / PageWipe.kt
-  function applyHeroPageTransform(pageEl, offset, incoming, forward, curved) {
-    const away = Math.abs(offset);
-    if (away >= 0.999) {
-      pageEl.style.opacity = "0";
-      return;
-    }
-    pageEl.style.opacity = "1";
-
-    // Feathered wipe mask (55% feather, 25% trailing offset so seam never flashes black)
-    const progress = incoming ? 1 - away : away;
-    const feather = 55;
-    const trail = 0.25;
-    const edgePct = 100 - progress * (100 + feather) + (incoming ? 0 : feather * trail);
-
-    if (curved) {
-      const start = Math.max(0, Math.min(100, edgePct));
-      const end = Math.max(0, Math.min(100, edgePct + feather));
-      const originX = forward ? "125%" : "-25%";
-      const mask = incoming
-        ? `radial-gradient(155% 120% at ${originX} 50%, #000 ${Math.max(0, 100 - end)}%, transparent ${Math.max(0, 100 - start)}%)`
-        : `radial-gradient(155% 120% at ${originX} 50%, transparent ${Math.max(0, 100 - end)}%, #000 ${Math.max(0, 100 - start)}%)`;
-      pageEl.style.webkitMaskImage = mask;
-      pageEl.style.maskImage = mask;
-    } else {
-      const dirDeg = forward ? "90deg" : "270deg";
-      const s = edgePct.toFixed(2);
-      const e = (edgePct + feather).toFixed(2);
-      const mask = incoming
-        ? `linear-gradient(${dirDeg}, transparent ${s}%, #000 ${e}%)`
-        : `linear-gradient(${dirDeg}, #000 ${s}%, transparent ${e}%)`;
-      pageEl.style.webkitMaskImage = mask;
-      pageEl.style.maskImage = mask;
-    }
-
-    // Media drift + zoom + blur
-    const media = pageEl.querySelector(".hero-media-wrap");
-    const textLayer = pageEl.querySelector(".hero-text-layer");
-    const mediaScale = 1 + 0.36 * Math.min(1, away);
-    const mediaTx = offset * 18;
-
-    // the blur is the cover's small copy underneath, shown as the sharp one fades; a live blur re-draws the whole page every frame
-    if (media) {
-      media.style.transform = `translate3d(${mediaTx.toFixed(2)}%, 0, 0) scale(${mediaScale.toFixed(4)})`;
-      const sharp = media.querySelector(".hero-cover-img");
-      if (sharp) sharp.style.opacity = away > 0.01 ? (1 - clamp01(away * 1.15)).toFixed(3) : "";
-    }
-
-    // Text drifts further and fades out before halfway so incoming & outgoing headlines never collide
-    if (textLayer) {
-      const textTx = offset * 58;
-      const textAlpha = clamp01(1 - away * 1.9);
-      textLayer.style.transform = `translate3d(${textTx.toFixed(2)}%, 0, 0)`;
-      textLayer.style.opacity = textAlpha.toFixed(3);
-    }
-  }
-
-  function transitionHeroPage(fromIdx, toIdx, forward, curved = false) {
-    const stage = $("hero-stage");
-    if (!stage) return;
-    cancelAnimationFrame(heroAnimRaf);
+  // the slide between pages, after PageWipe.kt. the new page is built and its covers decoded first, then it moves
+  function transitionHeroPage(fromIdx, toIdx, forward) {
+    if (!$("hero-stage")) return;
+    finishHeroSlide();
     clearTimeout(heroAutoTimer);
 
-    const fromCard = state.heroCards[fromIdx];
     const toCard = state.heroCards[toIdx];
     if (!toCard) return;
-
     state.heroIndex = toIdx;
     state.heroShownId = toCard.id;
     renderHeroDots();
-    preloadNextHeroCover();
+    preloadHeroCovers();
 
-    heroSwitching = true;
-    const outPage = stage.querySelector(".hero-page") || buildHeroPageElement(fromCard);
     const inPage = buildHeroPageElement(toCard);
+    const ticket = ++heroSlideTicket;
+    heroSwitching = true;
+    heroPageReady(inPage).then(() => {
+      if (ticket === heroSlideTicket) startHeroSlide(fromIdx, inPage, toCard, forward);
+    });
+  }
 
-    stage.innerHTML = "";
-    stage.appendChild(outPage);
-    stage.appendChild(inPage);
+  // only transforms and opacity move, so webkit hands it all to the compositor
+  function startHeroSlide(fromIdx, inPage, toCard, forward) {
+    const stage = $("hero-stage");
+    if (!stage) {
+      heroSwitching = false;
+      return;
+    }
+    const outPage = stage.querySelector(".hero-page") || buildHeroPageElement(state.heroCards[fromIdx]);
+    stage.replaceChildren(outPage, inPage);
+    if (toCard.isGacha) drawGachaFieldOnCanvas(inPage.querySelector(".gacha-field-canvas"), performance.now() * 0.001);
 
-    const dir = forward ? 1 : -1;
-    const duration = 1150;
-    const startTime = performance.now();
-
-    function frame(now) {
-      const raw = clamp01((now - startTime) / duration);
-      const p = HERO_EASE(raw);
-      const outOffset = -p * dir;
-      const inOffset = (1 - p) * dir;
-
-      applyHeroPageTransform(outPage, outOffset, false, forward, curved);
-      applyHeroPageTransform(inPage, inOffset, true, forward, curved);
-
-      if (toCard.isGacha) {
-        drawGachaFieldOnCanvas(inPage.querySelector(".gacha-field-canvas"), now * 0.001);
-      }
-
-      if (raw < 1) {
-        heroAnimRaf = requestAnimationFrame(frame);
-      } else {
-        heroSwitching = false;
-        inPage.style.webkitMaskImage = "";
-        inPage.style.maskImage = "";
-        const m = inPage.querySelector(".hero-media-wrap");
-        const tl = inPage.querySelector(".hero-text-layer");
-        if (m) {
-          m.style.transform = "";
-          const sharp = m.querySelector(".hero-cover-img");
-          if (sharp) sharp.style.opacity = "";
-        }
-        if (tl) {
-          tl.style.transform = "";
-          tl.style.opacity = "";
-        }
-        outPage.remove();
-        scheduleHeroAutoAdvance();
-      }
+    if (reducedMotion()) {
+      outPage.remove();
+      heroSwitching = false;
+      scheduleHeroAutoAdvance();
+      return;
     }
 
-    applyHeroPageTransform(outPage, 0, false, forward, curved);
-    applyHeroPageTransform(inPage, dir, true, forward, curved);
-    heroAnimRaf = requestAnimationFrame(frame);
+    const dir = forward ? 1 : -1;
+    const w = stage.clientWidth;
+    const outWords = liftHeroWords(stage, outPage);
+    const inWords = liftHeroWords(stage, inPage);
+    const anims = [
+      ...wipeHeroPageIn(inPage, dir, w),
+      ...driftHeroPage(outPage, dir, w, false),
+      ...driftHeroPage(inPage, dir, w, true),
+      ...pushHeroWords(outWords, 0, -dir * w),
+      ...pushHeroWords(inWords, dir * w, 0)
+    ];
+    heroSwitching = true;
+    heroSlide = { outPage, inPage, outWords, inWords, anims };
+    anims[0].finished.then(() => heroSlide?.inPage === inPage && finishHeroSlide(), () => {});
+  }
+
+  // the new page is widened by the feather and masked once; sliding it moves the soft edge across,
+  // while its body slides back the same amount so the picture itself stays where it lands
+  function wipeHeroPageIn(page, dir, w) {
+    const body = page.querySelector(".hero-page-body");
+    const feather = Math.round(w * HERO_FEATHER);
+    const travel = w + feather;
+    const mask = `linear-gradient(${dir > 0 ? 90 : 270}deg, transparent 0px, #000 ${feather}px)`;
+    page.style.left = dir > 0 ? `${-feather}px` : "0px";
+    page.style.width = `${travel}px`;
+    page.style.webkitMaskImage = mask;
+    page.style.maskImage = mask;
+    body.style.left = dir > 0 ? `${feather}px` : "0px";
+    body.style.width = `${w}px`;
+    return [
+      heroAnimate(page, [{ transform: `translate3d(${dir * travel}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }]),
+      heroAnimate(body, [{ transform: `translate3d(${-dir * travel}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }])
+    ];
+  }
+
+  // the picture drifts and zooms as it softens; the words are lifted out and pushed separately
+  function driftHeroPage(page, dir, w, incoming) {
+    const side = incoming ? dir : -dir;
+    const between = (moved, rest) => (incoming ? [moved, rest] : [rest, moved]);
+    const anims = [];
+
+    const media = page.querySelector(".hero-media-wrap");
+    if (media) {
+      const moved = { transform: `translate3d(${(side * w * 0.18).toFixed(1)}px, 0, 0) scale(1.36)` };
+      anims.push(heroAnimate(media, between(moved, { transform: "translate3d(0, 0, 0) scale(1)" })));
+    }
+    const sharp = page.querySelector(".hero-cover-img");
+    if (sharp) {
+      anims.push(heroAnimate(sharp, incoming
+        ? [{ opacity: 0 }, { opacity: 0, offset: 0.13 }, { opacity: 1 }]
+        : [{ opacity: 1 }, { opacity: 0, offset: 0.87 }, { opacity: 0 }]));
+    }
+    return anims;
+  }
+
+  // a page's words leave the masked page for the slide, so the wipe's soft edge never dims them
+  function liftHeroWords(stage, page) {
+    const words = page.querySelector(".hero-text-layer");
+    if (words) stage.appendChild(words);
+    return words;
+  }
+
+  // the two titles push each other a whole width at full brightness, so they never fade and never meet
+  function pushHeroWords(words, fromX, toX) {
+    if (!words) return [];
+    return [heroAnimate(words, [{ transform: `translate3d(${fromX}px, 0, 0)` }, { transform: `translate3d(${toX}px, 0, 0)` }])];
+  }
+
+  function heroAnimate(el, frames) {
+    return el.animate(frames, { duration: HERO_SLIDE_MS, easing: HERO_SLIDE_EASING, fill: "both" });
+  }
+
+  // lands a slide right away: the old page goes and the new one drops its wipe styles to become the settled page
+  function finishHeroSlide() {
+    const slide = heroSlide;
+    if (!slide) return;
+    heroSlide = null;
+    heroSwitching = false;
+    slide.outPage.remove();
+    slide.outWords?.remove();
+    const page = slide.inPage;
+    const body = page.querySelector(".hero-page-body");
+    if (slide.inWords) body.appendChild(slide.inWords);
+    page.style.left = "";
+    page.style.width = "";
+    page.style.webkitMaskImage = "";
+    page.style.maskImage = "";
+    body.style.left = "";
+    body.style.width = "";
+    slide.anims.forEach((a) => a.cancel());
+    scheduleHeroAutoAdvance();
   }
 
   function scheduleHeroAutoAdvance() {
@@ -2267,7 +2225,7 @@
     const delayMs = cur?.isGacha ? 11000 : 5500;
     heroAutoTimer = setTimeout(() => {
       if (state.tab === "home" && !state.routeStack.length && !state.heroHovered && !state.showFullPlayer) {
-        stepHeroCard(1, false);
+        stepHeroCard(1);
       }
     }, delayMs);
   }
@@ -2584,9 +2542,11 @@
   }
 
   // --------------------------------------------------------------------------
-  // Home Tab (Hero + Tucked Recently Played + Chips + Shelves + Scroll-Away Blur/Zoom)
+  // Home Tab (Hero + Tucked Recently Played + Shelves + Scroll-Away Soften/Zoom)
   // --------------------------------------------------------------------------
   let homeRevealObserver = null;
+  // the song lists the home shelves play from, by section key; the rows and the play-all dots read them
+  let homeLists = {};
 
   function renderHomeTab() {
     const container = $("tab-home");
@@ -2597,10 +2557,10 @@
         <div class="home-hero">
           <div class="skeleton" style="width:100%;height:100%;border-radius:0;"></div>
         </div>
-        <div class="page-section home-tucked-section">
-          <div class="skeleton" style="width:180px;height:22px;margin-bottom:14px;"></div>
-          <div style="display:flex;gap:14px;overflow:hidden;">
-            ${[0, 1, 2, 3, 4].map(() => `<div class="skeleton" style="width:142px;height:142px;border-radius:12px;flex-shrink:0;"></div>`).join("")}
+        <div class="shelf home-tucked-section">
+          <div class="skeleton" style="width:150px;height:18px;margin:0 0 14px var(--content-x);"></div>
+          <div style="display:flex;gap:16px;overflow:hidden;padding-left:var(--content-x);">
+            ${[0, 1, 2, 3, 4].map(() => `<div class="skeleton" style="width:156px;height:156px;border-radius:14px;flex-shrink:0;"></div>`).join("")}
           </div>
         </div>
       `;
@@ -2619,149 +2579,89 @@
     const filterExplicit = (list) =>
       state.settings.hideExplicit ? (list || []).filter((x) => !(x?.explicit || x?.data?.explicit)) : list || [];
 
+    const shelves = window.MochyShelves;
     const recent = filterExplicit(state.library.recentSongs || []).slice(0, 20);
-    const chips = state.homePage?.chips || [];
+    const quickPicks = filterExplicit(state.quickPicks).slice(0, 20);
+    const topSongs = filterExplicit((state.library.recap?.topSongs || []).map((e) => e.song)).slice(0, 12);
     const sections = (state.homePage?.sections || []).map((sec) =>
       state.settings.hideExplicit ? { ...sec, items: filterExplicit(sec.items) } : sec
     );
+    homeLists = { quickPicks, mostPlayed: topSongs };
 
-    // If user has Recently Played, tuck it into the hero's bottom fade; otherwise tuck the first section
-    const hasRecentTuck = recent.length > 0;
-    const firstTuckedHtml = hasRecentTuck
-      ? `
-        <section class="page-section home-tucked-section">
-          <div class="section-header">
-            <div class="section-header-left">
-              <div class="section-titles">
-                <button class="section-title-btn" id="home-recent-more">
-                  <h2 class="section-title">Recently Played</h2>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="shelf-scroller" id="recent-scroller">
-            ${recent.map((s) => renderItemCardHtml({ kind: "song", data: s }, { compact: true })).join("")}
-          </div>
-        </section>`
+    // recently played tucks into the hero's foot; without it the first feed section takes its place
+    const hasRecent = recent.length > 0;
+    const feedHtml = sections.map((sec, i) => shelves.feedSectionHtml(sec, `feed-${i}`, homeLists, { tucked: !hasRecent && i === 0 }));
+    const tuckedHtml = hasRecent
+      ? shelves.coverSectionHtml("recent", { title: "Recently played" }, recent.map((s) => ({ kind: "song", data: s })), { tucked: true })
+      : feedHtml.shift() || "";
+    const quickPicksHtml = quickPicks.length
+      ? shelves.trackSectionHtml("quickPicks", { title: "Quick picks", label: "Start radio from a song", playAll: true }, quickPicks, { listId: "quickPicks" })
       : "";
+    const mostPlayedHtml =
+      topSongs.length >= 3
+        ? shelves.trackSectionHtml(
+            "mostPlayed",
+            { title: "Most played", label: state.library.recap?.monthLabel || "This month", more: { route: "recap" }, playAll: true },
+            topSongs,
+            { listId: "mostPlayed", ranked: true }
+          )
+        : "";
 
     container.innerHTML = `
       <div class="home-hero" id="home-hero">
         <div class="hero-scroll-shell" id="hero-scroll-shell">
-          <div class="hero-veil" id="hero-veil"></div>
           <div class="hero-stage" id="hero-stage"></div>
           <div class="hero-dim" id="hero-dim"></div>
           <div class="hero-dots" id="hero-dots"></div>
         </div>
+        <div class="hero-fade"></div>
       </div>
 
       <div class="home-body">
-        ${firstTuckedHtml}
-
-        ${
-          chips.length
-            ? `
-          <div class="home-chips-wrap">
-            <div class="chips-row">
-              ${chips
-                .map(
-                  (c) => `
-                <button class="chip-btn ${state.selectedChipTitle === c.title ? "selected" : ""}" data-chip-title="${esc(c.title)}" data-chip-params="${esc(c.params || "")}">
-                  ${esc(c.title)}
-                </button>`
-                )
-                .join("")}
-            </div>
-          </div>`
-            : ""
-        }
-
-        ${
-          state.quickPicks.length
-            ? `
-          <section class="page-section reveal-section">
-            <div class="section-header">
-              <div class="section-header-left">
-                <div class="section-titles">
-                  <span class="section-strapline">START RADIO FROM A SONG</span>
-                  <h2 class="section-title">Quick picks</h2>
-                </div>
-              </div>
-            </div>
-            <div class="quick-picks-scroller" id="qp-scroller">
-              ${state.quickPicks
-                .slice(0, 20)
-                .map((s, idx) => renderSongRowHtml(s, { index: idx, listId: "quickPicks" }))
-                .join("")}
-            </div>
-          </section>`
-            : ""
-        }
-
-        <div id="home-shelves-wrap">
-          ${sections
-            .map((sec, sIdx) => renderHomeSectionHtml(sec, sIdx, !hasRecentTuck && sIdx === 0))
-            .join("")}
-        </div>
+        ${tuckedHtml}
+        ${quickPicksHtml}
+        ${mostPlayedHtml}
+        <div id="home-shelves-wrap">${feedHtml.join("")}</div>
       </div>
     `;
 
     renderSettledHeroPage();
     renderHeroDots();
-    preloadNextHeroCover();
+    preloadHeroCovers();
     scheduleHeroAutoAdvance();
     bindHomeEvents(container);
     setupHomeScrollAndReveal(container);
   }
 
-  function renderHomeSectionHtml(sec, sIdx, tucked = false) {
-    const scrollerId = `shelf-scroll-${sIdx}`;
-    const songsOnly = (sec.items || []).length >= 6 && (sec.items || []).every((i) => i.kind === "song");
-    const extraClass = tucked ? "home-tucked-section" : "reveal-section";
-
-    if (songsOnly) {
-      const songs = sec.items.map((i) => i.data);
-      return `
-        <section class="page-section ${extraClass}">
-          <div class="section-header">
-            <div class="section-header-left">
-              ${sec.thumbnail ? `<img class="section-seed-thumb" src="${esc(proxyImg(sizedCover(sec.thumbnail, 80)))}" alt="" />` : ""}
-              <div class="section-titles">
-                ${sec.label ? `<span class="section-strapline">${esc(sec.label)}</span>` : ""}
-                <h2 class="section-title">${esc(sec.title)}</h2>
-              </div>
-            </div>
-          </div>
-          <div class="quick-picks-scroller" id="${scrollerId}">
-            ${songs.map((s, idx) => renderSongRowHtml(s, { index: idx })).join("")}
-          </div>
-        </section>
-      `;
-    }
-
-    return `
-      <section class="page-section ${extraClass}">
-        <div class="section-header">
-          <div class="section-header-left">
-            ${sec.thumbnail ? `<img class="section-seed-thumb" src="${esc(proxyImg(sizedCover(sec.thumbnail, 80)))}" alt="" />` : ""}
-            <div class="section-titles">
-              ${sec.label ? `<span class="section-strapline">${esc(sec.label)}</span>` : ""}
-              <h2 class="section-title">${esc(sec.title)}</h2>
-            </div>
-          </div>
-          <div class="section-controls">
-            ${
-              sec.moreBrowseId
-                ? `<button class="shelf-more-btn" data-more-browse="${esc(sec.moreBrowseId)}" data-more-params="${esc(sec.moreParams || "")}" data-more-title="${esc(sec.title)}">See all</button>`
-                : ""
-            }
-          </div>
-        </div>
-        <div class="shelf-scroller" id="${scrollerId}">
-          ${(sec.items || []).map((item) => renderItemCardHtml(item, { compact: tucked })).join("")}
-        </div>
-      </section>
-    `;
+  // the shelves' own taps: a header opens its full section, its dots play all of it, a missing video still falls back to the cover
+  function bindShelves(root, lists = homeLists) {
+    root.querySelectorAll("[data-more-browse]").forEach((head) => {
+      head.onclick = () => {
+        pushRoute({
+          type: "section",
+          browseId: head.dataset.moreBrowse,
+          params: head.dataset.moreParams || null,
+          title: head.dataset.moreTitle || "More"
+        });
+      };
+    });
+    root.querySelectorAll("[data-more-route]").forEach((head) => {
+      head.onclick = () => pushRoute({ type: head.dataset.moreRoute });
+    });
+    root.querySelectorAll("[data-play-list]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const songs = lists[btn.dataset.playList];
+        if (songs?.length) playSong(songs[0], songs, 0);
+      };
+    });
+    root.querySelectorAll("img[data-fallback]").forEach((img) => {
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = img.dataset.fallback;
+      };
+    });
+    bindItemAndSongCards(root, lists);
   }
 
   function bindHomeEvents(container) {
@@ -2796,43 +2696,14 @@
             lastFire = now;
             const dir = swipeTravel > 0 ? 1 : -1;
             swipeTravel = 0;
-            stepHeroCard(dir, true);
+            stepHeroCard(dir);
           }
         },
         { passive: false }
       );
     }
 
-    const recMore = $("home-recent-more");
-    if (recMore) recMore.onclick = () => pushRoute({ type: "history" });
-
-    container.querySelectorAll("[data-chip-title]").forEach((btn) => {
-      btn.onclick = async () => {
-        const title = btn.dataset.chipTitle;
-        const params = btn.dataset.chipParams || null;
-        if (state.selectedChipTitle === title) {
-          state.selectedChipTitle = null;
-          state.homePage = await invoke("yt_home", { params: null });
-        } else {
-          state.selectedChipTitle = title;
-          state.homePage = await invoke("yt_home", { params });
-        }
-        renderHomeTab();
-      };
-    });
-
-    container.querySelectorAll("[data-more-browse]").forEach((btn) => {
-      btn.onclick = () => {
-        pushRoute({
-          type: "section",
-          browseId: btn.dataset.moreBrowse,
-          params: btn.dataset.moreParams || null,
-          title: btn.dataset.moreTitle || "More"
-        });
-      };
-    });
-
-    bindItemAndSongCards(container, { quickPicks: state.quickPicks });
+    bindShelves(container);
   }
 
   function setupHomeScrollAndReveal(container) {
@@ -2859,16 +2730,16 @@
       const heroH = Math.max(1, hero.clientHeight);
       const p = clamp01(container.scrollTop / heroH);
       state.heroScrollProgress = p;
-
-      const stage = $("hero-stage");
-      const veil = $("hero-veil");
       const dim = $("hero-dim");
-      if (p <= 0.001) {
+
+      // while scrolled, the dim and the sharp cover get their own layers, so fading them never repaints the hero
+      const scrolled = p > 0.001;
+      hero.classList.toggle("is-scrolled", scrolled);
+      if (!scrolled) {
         shell.style.transform = "";
         shell.style.opacity = "";
-        if (stage) stage.style.opacity = "";
-        if (veil) veil.style.opacity = "0";
         if (dim) dim.style.opacity = "0";
+        setHeroSharpness("");
         return;
       }
       const zoom = 1 + p * 0.22;
@@ -2878,17 +2749,8 @@
       shell.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0) scale(${zoom.toFixed(4)})`;
       shell.style.opacity = op.toFixed(3);
       if (dim) dim.style.opacity = (0.28 * p).toFixed(3);
-
-      // the blur is the cover's small copy sitting under the page, shown by fading the sharp page away
-      if (!stage || !veil) return;
-      const src = soft > 0 ? stage.querySelector(".hero-cover-blur-edges")?.getAttribute("src") : null;
-      if (src && veil._src !== src) {
-        veil._src = src;
-        veil.style.backgroundImage = `url("${src.replace(/"/g, "%22")}")`;
-      }
-      const covered = !!src && soft > 0;
-      veil.style.opacity = covered ? "1" : "0";
-      stage.style.opacity = covered ? (1 - soft).toFixed(3) : "";
+      // the blur is the page's own soft copy under the cover, shown by fading the sharp cover out
+      setHeroSharpness(soft > 0 ? (1 - soft).toFixed(3) : "");
     };
 
     container.onscroll = async () => {
@@ -2910,20 +2772,12 @@
             state.homePage.continuation = more.continuation;
             const wrap = $("home-shelves-wrap");
             if (wrap) {
-              const fragHtml = more.sections.map((sec, i) => renderHomeSectionHtml(sec, startIdx + i, false)).join("");
+              const fragHtml = more.sections
+                .map((sec, i) => window.MochyShelves.feedSectionHtml(sec, `feed-${startIdx + i}`, homeLists))
+                .join("");
               wrap.insertAdjacentHTML("beforeend", fragHtml);
-              bindItemAndSongCards(wrap);
+              bindShelves(wrap);
               wrap.querySelectorAll(".reveal-section:not(.revealed)").forEach((s) => homeRevealObserver.observe(s));
-              wrap.querySelectorAll("[data-more-browse]").forEach((btn) => {
-                btn.onclick = () => {
-                  pushRoute({
-                    type: "section",
-                    browseId: btn.dataset.moreBrowse,
-                    params: btn.dataset.moreParams || null,
-                    title: btn.dataset.moreTitle || "More"
-                  });
-                };
-              });
             }
           }
         } catch (_) {}
@@ -2935,6 +2789,13 @@
   // --------------------------------------------------------------------------
   // Reusable Cards & Song Rows
   // --------------------------------------------------------------------------
+  // writes the sharp cover's opacity only when it changed, since this runs on every scroll frame
+  function setHeroSharpness(value) {
+    $("hero-stage")?.querySelectorAll(".hero-cover-img").forEach((img) => {
+      if (img.style.opacity !== value) img.style.opacity = value;
+    });
+  }
+
   function renderSongRowHtml(song, opts = {}) {
     if (!song) return "";
     const isCurrent = state.currentSong?.id === song.id;
@@ -2982,18 +2843,17 @@
     `;
   }
 
-  function renderItemCardHtml(item, opts = {}) {
+  function renderItemCardHtml(item) {
     if (!item) return "";
     const v = item.data || item.value;
     if (!v) return "";
     const thumb = songThumb(v);
-    const compactCls = opts.compact ? "compact-card" : "";
 
     if (item.kind === "song") {
       const isCurrent = state.currentSong?.id === v.id;
       const dataSong = esc(JSON.stringify(v));
       return `
-        <div class="cover-card ${compactCls}" data-song-json="${dataSong}">
+        <div class="cover-card" data-song-json="${dataSong}">
           <div class="cover-card-art">
             ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 320)))}" loading="lazy" alt="" />` : ""}
             ${isCurrent ? `<div class="cover-card-active-scrim">${playingBarsHtml(state.isPlaying)}</div>` : ""}
@@ -3006,7 +2866,7 @@
     }
     if (item.kind === "album") {
       return `
-        <div class="cover-card ${compactCls}" data-album-id="${esc(v.browseId || v.id)}">
+        <div class="cover-card" data-album-id="${esc(v.browseId || v.id)}">
           <div class="cover-card-art">
             ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 320)))}" loading="lazy" alt="" />` : ""}
             <button class="cover-card-play">${ICONS.play}</button>
@@ -3018,7 +2878,7 @@
     }
     if (item.kind === "artist") {
       return `
-        <div class="cover-card circle ${compactCls}" data-artist-id="${esc(v.id)}">
+        <div class="cover-card circle" data-artist-id="${esc(v.id)}">
           <div class="cover-card-art circle">
             ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 320)))}" loading="lazy" alt="" />` : ""}
           </div>
@@ -3029,7 +2889,7 @@
     }
     if (item.kind === "playlist") {
       return `
-        <div class="cover-card ${compactCls}" data-playlist-id="${esc(v.id)}">
+        <div class="cover-card" data-playlist-id="${esc(v.id)}">
           <div class="cover-card-art">
             ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 320)))}" loading="lazy" alt="" />` : ""}
             <button class="cover-card-play">${ICONS.play}</button>
@@ -3093,7 +2953,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Search Tab
+  // Search Tab (the phone's: big title, pill field, moods & genres until you start typing)
   // --------------------------------------------------------------------------
   const SEARCH_FILTERS = [
     { label: "All", value: null },
@@ -3103,107 +2963,112 @@
     { label: "Artists", value: "EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D" },
     { label: "Playlists", value: "EgeKAQQoADgBagwQDhAKEAMQBRAJEAQ%3D" }
   ];
+  const SEARCH_HISTORY_MAX = 20;
+  const SUGGEST_DELAY_MS = 140;
+  const MOOD_TILE_RGB = [18, 18, 20];
+  const moodCovers = new Map();
+  const moodCoverQueue = [];
+  let moodCoversLoading = 0;
+  let moodObserver = null;
+  let suggestTimer = null;
+  let suggestSeq = 0;
 
+  // the field stays put while the page under it changes, so typing never loses focus
   function renderSearchTab() {
     const container = $("tab-search");
     container.innerHTML = `
       <div class="search-page-wrap">
-        <div class="search-bar-container">
-          <div class="search-input-box">
-            <span style="color:var(--text-tertiary)">${ICONS.search}</span>
-            <input id="search-input" type="text" placeholder="Search songs, artists, albums, playlists..." value="${esc(state.searchQuery)}" />
-            ${state.searchQuery ? `<button id="search-clear-btn" style="color:var(--text-tertiary)">✕</button>` : ""}
-          </div>
-          <div id="search-suggestions-box" class="suggestions-dropdown hidden"></div>
-        </div>
-
-        <div class="chips-row" style="margin-bottom:20px;">
-          ${SEARCH_FILTERS.map(
-            (f) => `
-            <button class="chip-btn ${state.searchFilter === f.value ? "selected" : ""}" data-sfilter="${esc(f.value ?? "")}">
-              ${esc(f.label)}
-            </button>`
-          ).join("")}
-        </div>
-
-        <div id="search-results-body">
-          ${renderSearchResultsHtml()}
-        </div>
+        ${pageHeadHtml("Search")}
+        ${pillFieldHtml("search-input", "Songs, artists, albums, playlists", state.searchQuery)}
+        <div id="search-body" class="search-body"></div>
       </div>
     `;
-
-    const input = $("search-input");
-    const suggBox = $("search-suggestions-box");
-
-    if (input) {
-      input.oninput = async (e) => {
-        state.searchQuery = e.target.value;
-        const q = state.searchQuery.trim();
-        if (!q) {
-          suggBox.classList.add("hidden");
-          return;
-        }
-        try {
-          const sugg = await invoke("yt_search_suggestions", { input: q });
-          if (sugg && (sugg.queries?.length || sugg.items?.length)) {
-            suggBox.innerHTML = (sugg.queries || [])
-              .map(
-                (sq) => `
-              <div class="suggestion-query-row" data-sugg-q="${esc(sq)}">
-                ${ICONS.search} <span>${esc(sq)}</span>
-              </div>`
-              )
-              .join("");
-            suggBox.classList.remove("hidden");
-            suggBox.querySelectorAll("[data-sugg-q]").forEach((row) => {
-              row.onclick = () => {
-                state.searchQuery = row.dataset.suggQ;
-                suggBox.classList.add("hidden");
-                executeSearch();
-              };
-            });
-          } else {
-            suggBox.classList.add("hidden");
-          }
-        } catch (_) {}
-      };
-
-      input.onkeydown = (e) => {
-        if (e.key === "Enter") {
-          suggBox.classList.add("hidden");
-          executeSearch();
-        }
-      };
-    }
-
-    const clearBtn = $("search-clear-btn");
-    if (clearBtn) {
-      clearBtn.onclick = () => {
+    bindPillField("search-input", {
+      onInput: onSearchInput,
+      onFocus: () => setSearchMode("typing"),
+      onBlur: () => {
+        if (state.searchMode === "typing" && !state.searchQuery.trim()) setSearchMode("browse");
+      },
+      onSubmit: () => submitSearch(state.searchQuery),
+      onBack: leaveSearch,
+      onClear: () => {
         state.searchQuery = "";
-        state.searchSummary = null;
-        state.searchPage = null;
-        renderSearchTab();
-        $("search-input")?.focus();
-      };
-    }
-
-    container.querySelectorAll("[data-sfilter]").forEach((btn) => {
-      btn.onclick = () => {
-        state.searchFilter = btn.dataset.sfilter || null;
-        if (state.searchQuery.trim()) executeSearch();
-        else renderSearchTab();
-      };
+        setSearchMode("typing");
+      }
     });
+    syncSearchFieldLook();
+    renderSearchBody();
+  }
 
-    bindItemAndSongCards(container);
+  // browse shows moods and genres, typing shows history and suggestions, results shows what came back
+  function setSearchMode(mode) {
+    if (state.searchMode === mode && mode !== "typing") return;
+    state.searchMode = mode;
+    syncSearchFieldLook();
+    renderSearchBody();
+  }
+
+  function syncSearchFieldLook() {
+    setPillFieldState("search-input", state.searchMode !== "browse", !!state.searchQuery);
+  }
+
+  function leaveSearch() {
+    state.searchQuery = "";
+    state.searchSubmitted = "";
+    state.searchSummary = null;
+    state.searchPage = null;
+    const input = $("search-input");
+    if (input) {
+      input.value = "";
+      input.blur();
+    }
+    setSearchMode("browse");
+  }
+
+  function onSearchInput(value) {
+    state.searchQuery = value;
+    state.searchMode = "typing";
+    syncSearchFieldLook();
+    clearTimeout(suggestTimer);
+    const q = value.trim();
+    if (!q) {
+      state.searchSuggest = null;
+      renderSearchBody();
+      return;
+    }
+    renderSearchBody();
+    const seq = ++suggestSeq;
+    suggestTimer = setTimeout(async () => {
+      try {
+        const sugg = await invoke("yt_search_suggestions", { input: q });
+        if (seq !== suggestSeq) return;
+        state.searchSuggest = { query: q, queries: sugg?.queries || [], items: sugg?.items || [] };
+        if (state.searchMode === "typing") renderSearchBody();
+      } catch (_) {}
+    }, SUGGEST_DELAY_MS);
+  }
+
+  async function submitSearch(query) {
+    const q = (query || "").trim();
+    if (!q) return;
+    state.searchQuery = q;
+    state.searchSubmitted = q;
+    rememberSearch(q);
+    const input = $("search-input");
+    if (input) {
+      input.value = q;
+      input.blur();
+    }
+    state.searchMode = "results";
+    syncSearchFieldLook();
+    await executeSearch();
   }
 
   async function executeSearch() {
-    const q = state.searchQuery.trim();
+    const q = state.searchSubmitted;
     if (!q) return;
     state.searchLoading = true;
-    renderSearchTab();
-
+    renderSearchBody();
     try {
       if (!state.searchFilter) {
         state.searchSummary = await invoke("yt_search_summary", { query: q });
@@ -3213,127 +3078,683 @@
         state.searchSummary = null;
       }
     } catch (err) {
-      showError(`Search failed: ${err}`);
+      showError("Search didn't go through. Check your connection and try again.");
     }
     state.searchLoading = false;
-    renderSearchTab();
+    if (state.searchMode === "results") renderSearchBody();
   }
 
-  function renderSearchResultsHtml() {
-    if (state.searchLoading) {
-      return `<div class="skeleton" style="width:100%;height:180px;"></div>`;
+  function rememberSearch(q) {
+    const rest = (state.settings.recentSearches || []).filter((x) => x.toLowerCase() !== q.toLowerCase());
+    state.settings.recentSearches = [q, ...rest].slice(0, SEARCH_HISTORY_MAX);
+    invoke("settings_update", { settings: state.settings }).catch(() => {});
+  }
+
+  function forgetSearch(q) {
+    state.settings.recentSearches = (state.settings.recentSearches || []).filter((x) => x !== q);
+    invoke("settings_update", { settings: state.settings }).catch(() => {});
+  }
+
+  function renderSearchBody() {
+    const body = $("search-body");
+    if (!body) return;
+    if (moodObserver) moodObserver.disconnect();
+    if (state.searchMode === "results") {
+      body.innerHTML = searchResultsHtml();
+      bindSearchResults(body);
+    } else if (state.searchMode === "typing") {
+      body.innerHTML = searchTypingHtml();
+      bindSearchTyping(body);
+    } else {
+      body.innerHTML = searchBrowseHtml();
+      bindSearchBrowse(body);
     }
-    if (state.searchSummary) {
-      const sections = state.searchSummary.sections || [];
-      return sections
-        .map((sec) => {
-          const songs = (sec.items || []).filter((i) => i.kind === "song").map((i) => i.data);
-          const others = (sec.items || []).filter((i) => i.kind !== "song");
-          return `
-            <div style="margin-bottom:26px;">
-              <h3 class="section-title" style="margin-bottom:10px;">${esc(sec.title)}</h3>
-              ${songs.map((s, idx) => renderSongRowHtml(s, { index: idx })).join("")}
-              ${
-                others.length
-                  ? `<div class="shelf-scroller" style="margin-top:8px;">${others.map((it) => renderItemCardHtml(it)).join("")}</div>`
-                  : ""
-              }
-            </div>
-          `;
+  }
+
+  // --- browse: youtube music's moods & genres as the phone's tinted tiles ---
+
+  function searchBrowseHtml() {
+    if (!state.moods) {
+      loadMoods();
+      return `<div class="search-loading"><span></span><span></span><span></span></div>`;
+    }
+    if (!state.moods.length) {
+      return `<div class="a-empty">Moods and genres didn't load. Check your connection and open Search again.</div>`;
+    }
+    return state.moods
+      .map(
+        (sec) => `
+        <section class="mood-section">
+          ${sectionHeadHtml(sec.title, { ruleBelow: true })}
+          <div class="mood-grid">${sec.items.map(moodTileHtml).join("")}</div>
+        </section>`
+      )
+      .join("");
+  }
+
+  async function loadMoods() {
+    if (state.moodsLoading) return;
+    state.moodsLoading = true;
+    try {
+      state.moods = await invoke("yt_moods");
+    } catch (_) {
+      state.moods = [];
+    }
+    state.moodsLoading = false;
+    if (state.searchMode === "browse") renderSearchBody();
+  }
+
+  function moodTileHtml(mood) {
+    const tint = moodTint(mood.stripeColor);
+    const from = mixRgb(MOOD_TILE_RGB, tint, 0.55);
+    const to = mixRgb(MOOD_TILE_RGB, tint, 0.16);
+    const key = moodKey(mood.browseId, mood.params);
+    return `
+      <button class="mood-tile" style="background:linear-gradient(135deg, rgb(${from}), rgb(${to}))"
+        data-mood-key="${esc(key)}" data-mood-browse="${esc(mood.browseId)}" data-mood-params="${esc(mood.params || "")}" data-mood-title="${esc(mood.title)}">
+        <span class="mood-covers">${moodCoversHtml(moodCovers.get(key))}</span>
+        <span class="mood-title">${esc(mood.title)}</span>
+      </button>`;
+  }
+
+  function moodCoversHtml(covers) {
+    if (!covers?.length) return "";
+    return [covers[1], covers[0]]
+      .map((url, i) => (url ? `<img class="mood-cover ${i ? "front" : "back"}" src="${esc(proxyImg(sizedCover(url, 128)))}" alt="" />` : ""))
+      .join("");
+  }
+
+  // the phone lifts youtube's stripe colour toward a soft middle grey, so every tile reads on black
+  function moodTint(stripe) {
+    const argb = Number(stripe) >>> 0;
+    const rgb = [(argb >> 16) & 255, (argb >> 8) & 255, argb & 255];
+    if (!rgb[0] && !rgb[1] && !rgb[2]) return [58, 58, 68];
+    return rgb.map((c) => Math.max(40, Math.min(220, Math.round(c + (170 - c) * 0.45))));
+  }
+
+  function mixRgb(base, tint, amount) {
+    return base.map((c, i) => Math.round(c + (tint[i] - c) * amount)).join(", ");
+  }
+
+  function moodKey(browseId, params) {
+    return `${browseId}|${params || ""}`;
+  }
+
+  function bindSearchBrowse(body) {
+    body.querySelectorAll("[data-mood-browse]").forEach((tile) => {
+      tile.onclick = () =>
+        pushRoute({
+          type: "section",
+          browseId: tile.dataset.moodBrowse,
+          params: tile.dataset.moodParams || null,
+          title: tile.dataset.moodTitle
+        });
+    });
+    // each tile's two covers come from its own page, fetched only once the tile is on screen
+    moodObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          moodObserver.unobserve(entry.target);
+          queueMoodCovers(entry.target.dataset.moodKey);
+        });
+      },
+      { root: $("tab-search"), rootMargin: "200px 0px" }
+    );
+    body.querySelectorAll("[data-mood-key]").forEach((tile) => {
+      if (!moodCovers.has(tile.dataset.moodKey)) moodObserver.observe(tile);
+    });
+  }
+
+  function queueMoodCovers(key) {
+    if (moodCovers.has(key) || moodCoverQueue.includes(key)) return;
+    moodCoverQueue.push(key);
+    pumpMoodCovers();
+  }
+
+  // two at a time, so a screenful of tiles doesn't fire thirty requests at once
+  async function pumpMoodCovers() {
+    while (moodCoversLoading < 2 && moodCoverQueue.length) {
+      const key = moodCoverQueue.shift();
+      const [browseId, params] = key.split("|");
+      moodCoversLoading++;
+      invoke("yt_browse_section", { browseId, params: params || null })
+        .then((items) => {
+          const covers = (items || [])
+            .map((it) => songThumb(it.data))
+            .filter(Boolean)
+            .slice(0, 2);
+          moodCovers.set(key, covers);
+          const holder = document.querySelector(`[data-mood-key="${CSS.escape(key)}"] .mood-covers`);
+          if (holder) holder.innerHTML = moodCoversHtml(covers);
         })
-        .join("");
+        .catch(() => moodCovers.set(key, []))
+        .finally(() => {
+          moodCoversLoading--;
+          pumpMoodCovers();
+        });
     }
-    if (state.searchPage) {
-      const items = state.searchPage.items || [];
-      const songs = items.filter((i) => i.kind === "song").map((i) => i.data);
-      const others = items.filter((i) => i.kind !== "song");
-      return `
-        <div>
-          ${songs.map((s, idx) => renderSongRowHtml(s, { index: idx })).join("")}
-          ${others.length ? `<div class="library-grid">${others.map((it) => renderItemCardHtml(it)).join("")}</div>` : ""}
+  }
+
+  // --- typing: what you searched before, then youtube's suggestions ---
+
+  function searchTypingHtml() {
+    const q = state.searchQuery.trim().toLowerCase();
+    const history = (state.settings.recentSearches || []).filter((h) => !q || h.toLowerCase().includes(q)).slice(0, q ? 4 : 12);
+    const sugg = state.searchSuggest && state.searchSuggest.query === state.searchQuery.trim() ? state.searchSuggest : null;
+    const parts = [];
+    if (history.length) {
+      parts.push(sectionHeadHtml("Recent searches", { ruleAbove: false, small: true }));
+      parts.push(
+        history
+          .map(
+            (h) => `
+          <div class="a-simple-row" data-fill-search="${esc(h)}">
+            <span class="a-simple-icon">${ICONS.clock}</span>
+            <span class="a-simple-text">${esc(h)}</span>
+            <button class="a-simple-trail" data-forget-search="${esc(h)}" title="Remove">${ICONS.close}</button>
+          </div>`
+          )
+          .join("")
+      );
+    }
+    if (sugg?.queries?.length) {
+      parts.push(sectionHeadHtml("Suggestions", { ruleAbove: !!history.length, small: true }));
+      parts.push(
+        sugg.queries
+          .map(
+            (sq) => `
+          <div class="a-simple-row" data-fill-search="${esc(sq)}">
+            <span class="a-simple-icon">${ICONS.search}</span>
+            <span class="a-simple-text">${esc(sq)}</span>
+          </div>`
+          )
+          .join("")
+      );
+    }
+    if (sugg?.items?.length) {
+      let songIdx = 0;
+      parts.push(sectionHeadHtml("Top results", { small: true }));
+      parts.push(sugg.items.map((it) => searchItemRowHtml(it, it.kind === "song" ? songIdx++ : 0)).join(""));
+    }
+    if (!parts.length) {
+      return q
+        ? `<div class="search-loading"><span></span><span></span><span></span></div>`
+        : `<div class="a-empty">Search for songs, artists, albums and playlists.</div>`;
+    }
+    return parts.join("");
+  }
+
+  // one result as a list row: songs as the usual song row, the rest with their kind under the title
+  function searchItemRowHtml(item, idx) {
+    const v = item.data;
+    if (!v) return "";
+    if (item.kind === "song") return renderSongRowHtml(v, { index: idx, listId: "searchSongs" });
+    const target =
+      item.kind === "album" ? `data-album-id="${esc(v.browseId)}"` : item.kind === "artist" ? `data-artist-id="${esc(v.id)}"` : `data-playlist-id="${esc(v.id)}"`;
+    const thumb = songThumb(v);
+    return `
+      <div class="song-row" ${target}>
+        <div class="song-row-art ${item.kind === "artist" ? "round" : ""}">
+          ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 120)))}" loading="lazy" alt="" />` : ""}
         </div>
+        <div class="song-row-meta">
+          <div class="song-row-title-line"><span class="song-row-title">${esc(v.title)}</span></div>
+          <div class="song-row-sub">${esc(itemDetail(item))}</div>
+        </div>
+      </div>`;
+  }
+
+  // "Album  •  by Someone  •  2021", the line the phone puts under a result
+  function itemDetail(item) {
+    const v = item.data;
+    const by = (names) => (names ? `by ${names}` : null);
+    const parts =
+      item.kind === "song"
+        ? [v.musicVideoType ? "Video" : "Song", by(artistNames(v)), v.duration ? formatTime(v.duration) : null]
+        : item.kind === "album"
+        ? ["Album", by((v.artists || []).map((a) => a.name).join(", ")), v.year]
+        : item.kind === "artist"
+        ? ["Artist"]
+        : ["Playlist", by(v.author), v.songCountText];
+    return parts.filter(Boolean).join("  •  ");
+  }
+
+  function bindSearchTyping(body) {
+    body.querySelectorAll("[data-fill-search]").forEach((row) => {
+      row.onclick = () => submitSearch(row.dataset.fillSearch);
+    });
+    body.querySelectorAll("[data-forget-search]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        forgetSearch(btn.dataset.forgetSearch);
+        renderSearchBody();
+      };
+    });
+    const songs = (state.searchSuggest?.items || []).filter((i) => i.kind === "song").map((i) => i.data);
+    bindItemAndSongCards(body, { searchSongs: songs });
+  }
+
+  // --- results: category pills, the top result card, then each section ---
+
+  function searchResultsHtml() {
+    const pills = `
+      <div class="cat-pills">
+        ${SEARCH_FILTERS.map(
+          (f) => `<button class="cat-pill ${state.searchFilter === f.value ? "selected" : ""}" data-sfilter="${esc(f.value ?? "")}">${esc(f.label)}</button>`
+        ).join("")}
+      </div>`;
+    if (state.searchLoading) return `${pills}<div class="search-loading"><span></span><span></span><span></span></div>`;
+
+    if (state.searchSummary) {
+      const top = state.searchSummary.top;
+      const sections = state.searchSummary.sections || [];
+      return `
+        ${pills}
+        ${top ? `${sectionHeadHtml("Top result", { ruleAbove: false })}${topResultHtml(top)}` : ""}
+        ${sections
+          .map((sec) => {
+            const songs = (sec.items || []).filter((i) => i.kind === "song");
+            const others = (sec.items || []).filter((i) => i.kind !== "song");
+            return `
+              <section class="search-section">
+                ${sectionHeadHtml(sec.title)}
+                ${songs.map((it, idx) => renderSongRowHtml(it.data, { index: idx, listId: `sec-${esc(sec.title)}` })).join("")}
+                ${others.length ? `<div class="shelf-scroller">${others.map((it) => renderItemCardHtml(it)).join("")}</div>` : ""}
+              </section>`;
+          })
+          .join("")}
       `;
     }
-    return `<div style="color:var(--text-tertiary);padding:32px 0;">Type a query and press Enter to search YouTube Music.</div>`;
+
+    const items = state.searchPage?.items || [];
+    if (!items.length) return `${pills}<div class="a-empty">Nothing found for "${esc(state.searchSubmitted)}".</div>`;
+    const songs = items.filter((i) => i.kind === "song");
+    const others = items.filter((i) => i.kind !== "song");
+    return `
+      ${pills}
+      ${songs.map((it, idx) => renderSongRowHtml(it.data, { index: idx, listId: "searchPage" })).join("")}
+      ${others.length ? `<div class="library-grid">${others.map((it) => renderItemCardHtml(it)).join("")}</div>` : ""}
+    `;
+  }
+
+  // the phone's top result: the art over a soft wash of itself, with a big white play button
+  function topResultHtml(item) {
+    const v = item.data;
+    if (!v) return "";
+    const thumb = songThumb(v);
+    const target =
+      item.kind === "song"
+        ? `data-song-json="${esc(JSON.stringify(v))}"`
+        : item.kind === "album"
+        ? `data-album-id="${esc(v.browseId)}"`
+        : item.kind === "artist"
+        ? `data-artist-id="${esc(v.id)}"`
+        : `data-playlist-id="${esc(v.id)}"`;
+    const playing = item.kind === "song" && state.currentSong?.id === v.id && state.isPlaying;
+    return `
+      <div class="top-result" ${target}>
+        ${thumb ? `<img class="top-result-wash" src="${esc(proxyImg(sizedCover(thumb, 120)))}" alt="" />` : ""}
+        <div class="top-result-shade"></div>
+        <div class="top-result-body">
+          <div class="top-result-art ${item.kind === "artist" ? "round" : ""}">
+            ${thumb ? `<img src="${esc(proxyImg(sizedCover(thumb, 320)))}" alt="" />` : ""}
+          </div>
+          <div class="top-result-row">
+            <div class="top-result-text">
+              <div class="top-result-title">${esc(v.title)}</div>
+              <div class="top-result-detail">${esc(itemDetail(item))}</div>
+            </div>
+            ${item.kind === "artist" ? "" : `<span class="top-result-play">${playing ? ICONS.pause : ICONS.play}</span>`}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function bindSearchResults(body) {
+    body.querySelectorAll("[data-sfilter]").forEach((btn) => {
+      btn.onclick = () => {
+        state.searchFilter = btn.dataset.sfilter || null;
+        executeSearch();
+      };
+    });
+    const lists = {};
+    (state.searchSummary?.sections || []).forEach((sec) => {
+      lists[`sec-${esc(sec.title)}`] = (sec.items || []).filter((i) => i.kind === "song").map((i) => i.data);
+    });
+    lists.searchPage = (state.searchPage?.items || []).filter((i) => i.kind === "song").map((i) => i.data);
+    bindItemAndSongCards(body, lists);
   }
 
   // --------------------------------------------------------------------------
-  // Library Tab
+  // Shared page pieces (the phone's title, pill field and section headers)
   // --------------------------------------------------------------------------
+  function pageHeadHtml(title) {
+    return `<div class="page-head"><h1 class="page-title">${esc(title)}</h1></div>`;
+  }
+
+  function pillFieldHtml(id, placeholder, value) {
+    return `
+      <div class="pill-field" id="${id}-field">
+        <button class="pill-field-lead" id="${id}-lead" tabindex="-1">${ICONS.search}</button>
+        <input id="${id}" type="text" placeholder="${esc(placeholder)}" value="${esc(value || "")}" autocomplete="off" spellcheck="false" />
+        <button class="pill-field-clear hidden" id="${id}-clear" title="Clear">${ICONS.close}</button>
+      </div>`;
+  }
+
+  // the leading icon turns into a back arrow while the field is in use, and the cross shows once there's text
+  function setPillFieldState(id, active, hasText) {
+    const lead = $(`${id}-lead`);
+    if (lead && lead._active !== active) {
+      lead._active = active;
+      lead.innerHTML = active ? ICONS.arrowLeft : ICONS.search;
+      lead.classList.toggle("is-back", active);
+    }
+    $(`${id}-clear`)?.classList.toggle("hidden", !hasText);
+  }
+
+  function bindPillField(id, { onInput, onFocus, onBlur, onSubmit, onBack, onClear }) {
+    const input = $(id);
+    if (!input) return;
+    input.oninput = () => onInput?.(input.value);
+    input.onfocus = () => onFocus?.();
+    // a beat later, so a click on a row under the field lands before the page changes
+    input.onblur = () => setTimeout(() => document.activeElement !== input && onBlur?.(), 150);
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") onSubmit?.();
+      else if (e.key === "Escape") {
+        e.stopPropagation();
+        onBack?.();
+      }
+    };
+    const lead = $(`${id}-lead`);
+    if (lead) lead.onclick = () => (lead._active ? onBack?.() : input.focus());
+    const clear = $(`${id}-clear`);
+    if (clear) {
+      clear.onclick = () => {
+        input.value = "";
+        onClear?.();
+        input.focus();
+      };
+    }
+  }
+
+  function sectionHeadHtml(title, { ruleAbove = true, ruleBelow = false, small = false } = {}) {
+    return `
+      <div class="a-section-head ${ruleAbove ? "rule-above" : ""} ${ruleBelow ? "rule-below" : ""} ${small ? "small" : ""}">
+        <h2>${esc(title)}</h2>
+      </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // Library Tab (the phone's: title and search, a grey tab track, then pinned, counts and liked)
+  // --------------------------------------------------------------------------
+  const LIBRARY_TABS = [
+    ["all", "All"],
+    ["songs", "Songs"],
+    ["playlists", "Playlists"],
+    ["albums", "Albums"],
+    ["artists", "Artists"]
+  ];
+  const LIBRARY_PINNED_MAX = 9;
+
   function renderLibraryTab() {
     const container = $("tab-library");
-    const f = state.libraryFilter;
-
+    if (!container) return;
+    loadLibraryPlaylistSongs();
+    // the header stays once it's drawn, so a library change while you type in its search keeps your place
+    if ($("library-body")) return renderLibraryBody();
     container.innerHTML = `
       <div class="library-page-wrap">
-        <div class="library-header-bar">
-          <h1 style="font-size:26px;font-weight:800;">Your Library</h1>
-          <button class="pill-action-btn secondary" id="lib-new-pl-btn">${ICONS.plus} <span>New Playlist</span></button>
+        ${pageHeadHtml("Library")}
+        ${pillFieldHtml("library-input", "Search your library", state.libraryQuery)}
+        <div class="seg-track" id="library-tabs">
+          ${LIBRARY_TABS.map(([k, label]) => `<button class="seg-chip ${state.libraryTab === k ? "selected" : ""}" data-lib-tab="${k}">${label}</button>`).join("")}
         </div>
+        <div id="library-body" class="library-body"></div>
+      </div>
+    `;
+    bindPillField("library-input", {
+      onInput: (value) => {
+        state.libraryQuery = value;
+        setPillFieldState("library-input", !!value, !!value);
+        renderLibraryBody();
+      },
+      onBack: () => clearLibrarySearch(),
+      onClear: () => clearLibrarySearch()
+    });
+    setPillFieldState("library-input", !!state.libraryQuery, !!state.libraryQuery);
+    container.querySelectorAll("[data-lib-tab]").forEach((btn) => {
+      btn.onclick = () => showLibraryTab(btn.dataset.libTab);
+    });
+    renderLibraryBody();
+  }
 
-        <div class="chips-row" style="margin-bottom:22px;">
-          ${["all", "playlists", "liked", "history"]
+  function showLibraryTab(tab) {
+    state.libraryTab = tab;
+    $("library-tabs")?.querySelectorAll("[data-lib-tab]").forEach((b) => b.classList.toggle("selected", b.dataset.libTab === tab));
+    renderLibraryBody();
+  }
+
+  function clearLibrarySearch() {
+    state.libraryQuery = "";
+    const input = $("library-input");
+    if (input) input.value = "";
+    setPillFieldState("library-input", false, false);
+    renderLibraryBody();
+  }
+
+  function renderLibraryBody() {
+    const body = $("library-body");
+    if (!body) return;
+    const q = state.libraryQuery.trim().toLowerCase();
+    const tab = state.libraryTab;
+    body.innerHTML = q
+      ? librarySearchHtml(q)
+      : tab === "songs"
+      ? librarySongsHtml(librarySongs())
+      : tab === "playlists"
+      ? libraryPlaylistsHtml()
+      : tab === "albums"
+      ? libraryGridHtml(libraryAlbums(), "No albums yet. Like a song and its album shows up here.")
+      : tab === "artists"
+      ? libraryGridHtml(libraryArtists(), "No artists yet. Like a song and its artists show up here.")
+      : libraryAllHtml();
+    bindLibraryBody(body);
+  }
+
+  // --- what's in the library: liked songs plus every song saved in a playlist ---
+
+  // playlists only keep song ids, so their songs are fetched once per change and kept beside the liked ones
+  async function loadLibraryPlaylistSongs() {
+    const liked = new Set(state.library.likedIds || []);
+    const ids = [...new Set((state.library.playlists || []).flatMap((pl) => pl.songIds || []))].filter((id) => !liked.has(id));
+    const key = ids.join(",");
+    if (state.libraryExtraKey === key) return;
+    state.libraryExtraKey = key;
+    if (!ids.length) {
+      state.libraryExtraSongs = [];
+      return;
+    }
+    try {
+      const songs = await invoke("lib_songs_by_ids", { ids });
+      if (state.libraryExtraKey !== key) return;
+      state.libraryExtraSongs = songs || [];
+      if (state.tab === "library" && !state.routeStack.length) renderLibraryBody();
+    } catch (_) {}
+  }
+
+  function librarySongs() {
+    const seen = new Set();
+    return [...(state.library.likedSongs || []), ...(state.libraryExtraSongs || [])].filter((s) => s && !seen.has(s.id) && seen.add(s.id));
+  }
+
+  function libraryAlbums() {
+    const byId = new Map();
+    librarySongs().forEach((s) => {
+      if (!s.album?.id || byId.has(s.album.id)) return;
+      byId.set(s.album.id, { kind: "album", data: { browseId: s.album.id, title: s.album.name, artists: s.artists || [], thumbnail: songThumb(s) } });
+    });
+    return [...byId.values()];
+  }
+
+  function libraryArtists() {
+    const byId = new Map();
+    librarySongs().forEach((s) =>
+      (s.artists || []).forEach((a) => {
+        if (a.id && !byId.has(a.id)) byId.set(a.id, { kind: "artist", data: { id: a.id, title: a.name, thumbnail: null } });
+      })
+    );
+    return [...byId.values()];
+  }
+
+  // --- All: pinned tiles, the four count cards, then liked ---
+
+  function libraryAllHtml() {
+    const songs = librarySongs();
+    const playlists = state.library.playlists || [];
+    const albums = libraryAlbums();
+    const artists = libraryArtists();
+    const liked = state.library.likedSongs || [];
+    if (!songs.length && !playlists.length) {
+      return `<div class="a-empty">Your library is empty. Like songs or make a playlist and they show up here.</div>`;
+    }
+
+    const pinned = playlists.filter((pl) => pl.isPinned).slice(0, LIBRARY_PINNED_MAX);
+    const pinnedHtml = pinned.length
+      ? `
+        <h2 class="lib-section-title">Pinned</h2>
+        <div class="lib-rule"></div>
+        <div class="lib-pinned-grid">
+          ${pinned
             .map(
-              (k) => `
-            <button class="chip-btn ${f === k ? "selected" : ""}" data-lib-filter="${k}">
-              ${k === "all" ? "All" : k === "playlists" ? "Playlists" : k === "liked" ? "Liked Songs" : "Recently Played"}
+              (pl) => `
+            <button class="lib-pinned-tile" data-local-pl-card="${esc(pl.id)}" title="${esc(pl.name)}">
+              ${pl.covers?.[0] ? `<img src="${esc(proxyImg(sizedCover(pl.covers[0], 300)))}" alt="" />` : ICONS.music}
             </button>`
             )
             .join("")}
         </div>
+        <div class="lib-rule"></div>`
+      : "";
 
-        <div class="library-grid">
-          ${
-            f === "all" || f === "liked"
-              ? `
-            <div class="cover-card" data-lib-route="liked">
-              <div class="cover-card-art" style="background:linear-gradient(135deg,#fa5c80,#8c4cf2);display:flex;align-items:center;justify-content:center;">
-                <span style="transform:scale(2.2);color:#fff;">${ICONS.heartFilled}</span>
-              </div>
-              <div class="cover-card-title">Liked Songs</div>
-              <div class="cover-card-sub">${(state.library.likedSongs || []).length} songs</div>
-            </div>`
-              : ""
-          }
-          ${
-            f === "all" || f === "history"
-              ? `
-            <div class="cover-card" data-lib-route="history">
-              <div class="cover-card-art" style="background:#242428;display:flex;align-items:center;justify-content:center;">
-                <span style="transform:scale(2.2);color:#fff;">${ICONS.clock}</span>
-              </div>
-              <div class="cover-card-title">Recently Played</div>
-              <div class="cover-card-sub">${(state.library.recentSongs || []).length} songs</div>
-            </div>`
-              : ""
-          }
-          ${
-            f === "all" || f === "playlists"
-              ? (state.library.playlists || []).map((pl) => renderLocalPlaylistCardHtml(pl)).join("")
-              : ""
-          }
-        </div>
+    const cards = [
+      ["songs", "Songs", songs.length, songs.slice(0, 2).map(songThumb), false],
+      ["playlists", "Playlists", playlists.length, playlists.flatMap((pl) => pl.covers || []).slice(0, 2), false],
+      ["albums", "Albums", albums.length, albums.slice(0, 2).map((a) => a.data.thumbnail), false],
+      ["artists", "Artists", artists.length, [], true]
+    ];
+    return `
+      ${pinnedHtml}
+      <div class="lib-card-grid">
+        ${cards
+          .map(
+            ([tab, title, count, covers, round]) => `
+          <button class="lib-card" data-lib-jump="${tab}">
+            <span class="lib-card-text">
+              <span class="lib-card-label">${title}</span>
+              <span class="lib-card-count">${count}</span>
+            </span>
+            ${coverStackHtml(covers, round)}
+          </button>`
+          )
+          .join("")}
       </div>
+      ${
+        liked.length
+          ? `
+        <button class="lib-wide-card" data-lib-route="liked">
+          <span class="lib-card-text">
+            <span class="lib-card-label">Liked</span>
+            <span class="lib-card-count">${liked.length}</span>
+          </span>
+          ${coverStackHtml(liked.slice(0, 1).map(songThumb), false, `<span class="lib-liked-art">${ICONS.heartFilled}</span>`)}
+        </button>`
+          : ""
+      }
     `;
+  }
 
-    const newBtn = $("lib-new-pl-btn");
-    if (newBtn) newBtn.onclick = () => promptNewPlaylist();
+  // two real covers fanned into the card's corner, the back one dimmed and turned the other way
+  function coverStackHtml(covers, round, front = "") {
+    const shown = covers.filter(Boolean);
+    if (!shown.length && !front) return "";
+    const back = front ? shown[0] : shown[1];
+    const tile = (url, cls) =>
+      url ? `<span class="lib-stack-tile ${cls} ${round ? "round" : ""}"><img src="${esc(proxyImg(sizedCover(url, 160)))}" alt="" /></span>` : "";
+    return `
+      <span class="lib-stack">
+        ${tile(back, "back")}
+        ${front ? `<span class="lib-stack-tile front">${front}</span>` : tile(shown[0], "front")}
+      </span>`;
+  }
 
-    container.querySelectorAll("[data-lib-filter]").forEach((btn) => {
-      btn.onclick = () => {
-        state.libraryFilter = btn.dataset.libFilter;
-        renderLibraryTab();
-      };
+  // --- the other tabs ---
+
+  function librarySongsHtml(songs) {
+    if (!songs.length) return `<div class="a-empty">No songs yet. Like a song or add it to a playlist.</div>`;
+    return `<div class="lib-list">${songs.map((s, idx) => renderSongRowHtml(s, { index: idx, listId: "librarySongs" })).join("")}</div>`;
+  }
+
+  function libraryPlaylistsHtml() {
+    const playlists = state.library.playlists || [];
+    return `
+      <div class="library-grid">
+        <button class="cover-card lib-new-card" id="lib-new-pl-btn">
+          <div class="cover-card-art"><span class="lib-new-plus">${ICONS.plus}</span></div>
+          <div class="cover-card-title">New playlist</div>
+        </button>
+        ${playlists.map((pl) => renderLocalPlaylistCardHtml(pl)).join("")}
+      </div>`;
+  }
+
+  function libraryGridHtml(items, emptyText) {
+    if (!items.length) return `<div class="a-empty">${esc(emptyText)}</div>`;
+    return `<div class="library-grid">${items.map((it) => renderItemCardHtml(it)).join("")}</div>`;
+  }
+
+  function librarySearchSongs(q) {
+    const has = (text) => (text || "").toLowerCase().includes(q);
+    return librarySongs().filter((s) => has(s.title) || has(artistNames(s)) || has(s.album?.name));
+  }
+
+  function librarySearchHtml(q) {
+    const has = (text) => (text || "").toLowerCase().includes(q);
+    const songs = librarySearchSongs(q);
+    const playlists = (state.library.playlists || []).filter((pl) => has(pl.name));
+    const albums = libraryAlbums().filter((a) => has(a.data.title));
+    const artists = libraryArtists().filter((a) => has(a.data.title));
+    if (!songs.length && !playlists.length && !albums.length && !artists.length) {
+      return `<div class="a-empty">Nothing in your library matches "${esc(state.libraryQuery.trim())}".</div>`;
+    }
+    return `
+      ${songs.length ? `${sectionHeadHtml("Songs", { ruleAbove: false, small: true })}<div class="lib-list">${songs.map((s, idx) => renderSongRowHtml(s, { index: idx, listId: "librarySearch" })).join("")}</div>` : ""}
+      ${playlists.length ? `${sectionHeadHtml("Playlists", { small: true })}<div class="library-grid">${playlists.map((pl) => renderLocalPlaylistCardHtml(pl)).join("")}</div>` : ""}
+      ${albums.length ? `${sectionHeadHtml("Albums", { small: true })}<div class="library-grid">${albums.map((it) => renderItemCardHtml(it)).join("")}</div>` : ""}
+      ${artists.length ? `${sectionHeadHtml("Artists", { small: true })}<div class="library-grid">${artists.map((it) => renderItemCardHtml(it)).join("")}</div>` : ""}
+    `;
+  }
+
+  function bindLibraryBody(body) {
+    body.querySelectorAll("[data-lib-jump]").forEach((card) => {
+      card.onclick = () => showLibraryTab(card.dataset.libJump);
     });
-
-    container.querySelectorAll("[data-lib-route]").forEach((card) => {
+    body.querySelectorAll("[data-lib-route]").forEach((card) => {
       card.onclick = () => pushRoute({ type: card.dataset.libRoute });
     });
-
-    container.querySelectorAll("[data-local-pl-card]").forEach((card) => {
+    body.querySelectorAll("[data-local-pl-card]").forEach((card) => {
       const pid = card.dataset.localPlCard;
       card.onclick = () => pushRoute({ type: "localPlaylist", id: pid });
+      card.oncontextmenu = (e) => {
+        e.preventDefault();
+        const pl = (state.library.playlists || []).find((p) => p.id === pid);
+        if (pl) openLocalPlaylistContextMenu(e.clientX, e.clientY, pl);
+      };
     });
+    const newBtn = $("lib-new-pl-btn");
+    if (newBtn) newBtn.onclick = () => promptNewPlaylist();
+    const q = state.libraryQuery.trim().toLowerCase();
+    bindItemAndSongCards(body, { librarySongs: librarySongs(), librarySearch: q ? librarySearchSongs(q) : [] });
   }
 
   function renderLocalPlaylistCardHtml(pl) {
@@ -3354,10 +3775,12 @@
   }
 
   // --------------------------------------------------------------------------
-  // Detail Route Views (Album, Artist, Playlist, LocalPlaylist, Liked, History, Section, Recap)
+  // Detail Route Views (Album, Artist, Playlist, LocalPlaylist, Liked, Section, Recap)
   // --------------------------------------------------------------------------
   async function renderRouteView(route) {
     const container = $("route-container");
+    // the css shows playlist pages bare, so it needs to know which kind of page this is
+    container.dataset.route = route.type;
     container.innerHTML = `<div style="padding:84px var(--gutter);"><div class="skeleton" style="width:100%;height:200px;"></div></div>`;
 
     try {
@@ -3370,24 +3793,6 @@
           coverUrl: songThumb(songs[0]),
           songs
         });
-      } else if (route.type === "history") {
-        const songs = state.library.recentSongs || [];
-        renderSongCollectionDetail(container, {
-          kicker: "HISTORY",
-          title: "Recently Played",
-          subtitle: `${songs.length} songs`,
-          coverUrl: songThumb(songs[0]),
-          songs,
-          extraActionHtml: `<button class="pill-action-btn secondary" id="clear-history-btn">Clear History</button>`
-        });
-        const clr = $("clear-history-btn");
-        if (clr) {
-          clr.onclick = async () => {
-            state.library = await invoke("lib_clear_history");
-            renderRouteView(route);
-            renderHomeTab();
-          };
-        }
       } else if (route.type === "localPlaylist") {
         const pl = (state.library.playlists || []).find((p) => p.id === route.id);
         if (!pl) return popRoute();
@@ -3502,6 +3907,7 @@
 
   function renderArtistDetail(container, page) {
     const thumb = page.banner || songThumb(page.artist);
+    const lists = {};
     container.innerHTML = `
       <div class="detail-header">
         <div class="detail-header-backdrop" style="background-image:url('${esc(proxyImg(thumb || ""))}')"></div>
@@ -3519,12 +3925,12 @@
           }
         </div>
       </div>
-      <div class="detail-body">
-        ${(page.sections || []).map((sec, idx) => renderHomeSectionHtml(sec, idx, false)).join("")}
+      <div class="shelves-body">
+        ${(page.sections || []).map((sec, idx) => window.MochyShelves.feedSectionHtml(sec, `artist-${idx}`, lists)).join("")}
       </div>
     `;
     container.querySelectorAll(".reveal-section").forEach((s) => s.classList.add("revealed"));
-    bindItemAndSongCards(container);
+    bindShelves(container, lists);
   }
 
   function renderRecapDetail(container) {
@@ -3598,15 +4004,17 @@
   }
 
   function renderPlayerStateChange() {
+    window.MochyRemote?.reportPlayer();
     renderTopBar();
     updateSettledHeroTextAndState();
-    if (state.rightPaneOpen && ["queue", "randomize", "repeat"].includes(state.rightPaneTab)) {
+    if (state.rightPaneOpen && state.rightPaneTab === "queue") {
       renderRightPane();
     }
     if (state.showFullPlayer) patchFullPlayerPlayState();
   }
 
   function renderAllPlayerSurfaces() {
+    window.MochyRemote?.reportPlayer();
     renderTopBar();
     if (state.rightPaneOpen) renderRightPane();
     if (state.showFullPlayer) renderFullPlayer();
@@ -3624,7 +4032,11 @@
     }
     const lyr = state.currentLyrics;
     if (!lyr || !lyr.lines || !lyr.lines.length) {
-      return `<div style="padding:48px 20px;color:var(--text-tertiary);text-align:center;">No lyrics found for this song.</div>`;
+      return `
+        <div class="lyrics-empty">
+          <span>No lyrics found for this song.</span>
+          ${lyricsSwitchButtonHtml("Try another source")}
+        </div>`;
     }
 
     return `
@@ -3648,11 +4060,30 @@
             `;
           })
           .join("")}
+        ${lyricsSourceFooterHtml(lyr)}
       </div>
     `;
   }
 
+  // where the lyrics came from, after the last line, like the phone's lyrics page
+  function lyricsSourceFooterHtml(lyr) {
+    const name = (lyr.providerName || "").trim();
+    if (!name || name === "Unknown") return "";
+    return `
+      <div class="lyrics-source-footer">
+        <span class="lyrics-source-text"><b>Source</b> ${esc(name)}</span>
+        ${lyricsSwitchButtonHtml("Switch")}
+      </div>`;
+  }
+
+  function lyricsSwitchButtonHtml(label) {
+    return `<button class="lyrics-switch-btn" data-lyrics-switch>${ICONS.swap}<span>${esc(label)}</span></button>`;
+  }
+
   function bindLyricsSeekEvents(root) {
+    root.querySelectorAll("[data-lyrics-switch]").forEach((btn) => {
+      btn.onclick = (e) => openLyricsPickerPopover(e.currentTarget.getBoundingClientRect());
+    });
     root.querySelectorAll("[data-lyric-seek]").forEach((el) => {
       el.onclick = () => {
         const t = parseFloat(el.dataset.lyricSeek || "0");
@@ -3717,8 +4148,8 @@
     const pill = pillRect();
     const closed = `inset(${pill.top}px ${window.innerWidth - pill.right}px ${window.innerHeight - pill.bottom}px ${pill.left}px round ${pill.height / 2}px)`;
     const open = "inset(0px 0px 0px 0px round 0px)";
-    const ms = opening ? 560 : 360;
-    const easing = opening ? "cubic-bezier(0.22, 1, 0.36, 1)" : "cubic-bezier(0.4, 0, 0.2, 1)";
+    const ms = opening ? 600 : 360;
+    const easing = opening ? IOS_EASE : "cubic-bezier(0.4, 0, 0.2, 1)";
     const fill = opening ? "backwards" : "forwards";
     const run = (el, frames, opts) => {
       if (!el) return null;
@@ -3732,7 +4163,7 @@
 
     // the rest fades in a beat behind the growing box (and out ahead of it)
     const rise = [{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }];
-    const lift = opening ? { duration: 380, easing: "cubic-bezier(0.22, 1, 0.36, 1)" } : { duration: 160, easing: "ease-in" };
+    const lift = opening ? { duration: 460, easing: IOS_EASE } : { duration: 160, easing: "ease-in" };
     parts.push(run(fp.querySelector("#ambient-canvas"), [{ opacity: 0 }, { opacity: 1 }], { duration: opening ? 480 : 200, delay: opening ? 60 : 0 }));
     parts.push(run(fp.querySelector(".full-player-topbar"), rise, { ...lift, delay: opening ? 180 : 0 }));
     const items = fp.querySelectorAll(".fp-left-column > :not(.fp-cover-deck), .fp-right-column");
@@ -3785,23 +4216,6 @@
     }
   }
 
-  function formatBadgeHtml() {
-    const prefs = window.MochySettingsUI?.ensurePrefsOnSettings(state.settings);
-    const bh = prefs?.behaviour;
-    if (bh?.larpMode) {
-      const lvl = (window.MochySettingsUI?.LARP_LEVELS || []).find((l) => l.id === bh.larpLevel) || {
-        badge: "FLAC · 32-bit / 768 kHz",
-        dac: "Wadax Atlantis Reference"
-      };
-      return `<div class="format-badge-pill larp">${esc(lvl.badge)} · ${esc(lvl.dac)}</div>`;
-    }
-    const np = prefs?.nowPlaying;
-    if (np?.showFormatBadge === false || !state.currentStreamMeta) return "";
-    const meta = state.currentStreamMeta;
-    const text = np?.showSampleRate && meta.formatLabel ? meta.formatLabel : meta.codec || meta.formatLabel || "";
-    return text ? `<div class="format-badge-pill">${esc(text)}</div>` : "";
-  }
-
   function renderFullPlayer() {
     const fp = $("full-player");
     if (!state.showFullPlayer) return;
@@ -3819,9 +4233,6 @@
     fp.innerHTML = `
       <canvas id="ambient-canvas"></canvas>
       <div class="full-player-topbar">
-        <button class="lyrics-source-pill" id="fp-lyrics-source-btn">
-          <span>${esc(state.currentLyrics?.providerName || "Lyrics Source")}</span>
-        </button>
         <button class="icon-btn ${state.fullPlayerMode === "lyrics" ? "active" : ""}" id="fp-mode-lyrics" title="Lyrics">${ICONS.lyrics}</button>
         <button class="icon-btn ${state.fullPlayerMode === "queue" ? "active" : ""}" id="fp-mode-queue" title="Queue">${ICONS.queue}</button>
         <button class="icon-btn" id="fp-close-btn" title="Close (Esc)">${ICONS.close}</button>
@@ -3836,11 +4247,10 @@
             <div style="min-width:0;flex:1;">
               <div class="fp-song-title">${esc(song?.title || "Not Playing")}</div>
               <div class="fp-song-artist">${esc(song ? artistNames(song) : "")}</div>
-              ${song ? formatBadgeHtml() : ""}
             </div>
             ${
               song
-                ? `<button class="icon-btn" id="fp-like-btn" style="color:${liked ? "#ff375f" : "var(--text-secondary)"}">${liked ? ICONS.heartFilled : ICONS.heart}</button>`
+                ? `<button class="icon-btn" id="fp-like-btn" style="color:${liked ? "#fff" : "var(--text-secondary)"}">${liked ? ICONS.heartFilled : ICONS.heart}</button>`
                 : ""
             }
           </div>
@@ -3900,7 +4310,6 @@
       state.fullPlayerMode = "queue";
       renderFullPlayer();
     };
-    $("fp-lyrics-source-btn").onclick = (e) => openLyricsPickerPopover(e.currentTarget.getBoundingClientRect());
     mountTransport("fp", $("fp-prev-btn"), $("fp-play-btn"), $("fp-next-btn"));
     $("fp-shuffle-btn").onclick = () => {
       applyShuffleState(!state.shuffleEnabled, true);
@@ -3940,26 +4349,16 @@
     const layer = $("popover-layer");
     layer.classList.remove("hidden");
     const left = Math.min(window.innerWidth - 272, Math.max(12, anchorRect.right + 10));
-    const top = Math.min(window.innerHeight - 360, Math.max(48, anchorRect.bottom - 310));
-    const name = state.settings.profileName || "";
+    const top = Math.min(window.innerHeight - 220, Math.max(48, anchorRect.bottom - 170));
 
     layer.innerHTML = `
-      <div class="popover-card" style="left:${left}px;top:${top}px;width:260px;" id="popover-card-inner">
-        <div class="profile-head">
-          <div class="profile-avatar-lg">${esc(profileInitials())}</div>
-          <div style="min-width:0;flex:1;">
-            <input id="profile-name-input" class="plain-input" placeholder="Your name" value="${esc(name)}" />
-            <div class="profile-note">Local profile</div>
-          </div>
-        </div>
+      <div class="popover-card" style="left:${left}px;top:${top}px;width:240px;" id="popover-card-inner">
         <div class="pop-rows">
           <button data-pr="recap">${ICONS.sparkles}<span>Your month in music</span></button>
-          <button data-pr="history">${ICONS.clock}<span>Listening history</span></button>
           <button data-pr="liked">${ICONS.heart}<span>Liked songs</span></button>
           <div class="ctx-sep"></div>
           <button data-pr="audiolab">${ICONS.sparkles}<span>Audio Lab & FX…</span></button>
           <button data-pr="settings">${ICONS.settings}<span>Settings…</span></button>
-          <button data-pr="clear" class="danger">${ICONS.close}<span>Clear listening history</span></button>
         </div>
       </div>
     `;
@@ -3968,27 +4367,13 @@
       if (!e.target.closest("#popover-card-inner")) layer.classList.add("hidden");
     };
 
-    const input = $("profile-name-input");
-    input.onchange = async () => {
-      state.settings.profileName = input.value.trim();
-      await invoke("settings_update", { settings: state.settings }).catch(() => {});
-      renderSidebar();
-      syncHeroCards();
-    };
-
     layer.querySelectorAll("[data-pr]").forEach((btn) => {
-      btn.onclick = async () => {
+      btn.onclick = () => {
         const what = btn.dataset.pr;
         layer.classList.add("hidden");
-        if (what === "recap" || what === "history" || what === "liked") pushRoute({ type: what });
-        else if (what === "audiolab") openSettingsModal("audio_lab", null);
-        else if (what === "settings") openSettingsModal();
-        else if (what === "clear") {
-          if (confirm("Clear your listening history? Your recap and recently played will start over.")) {
-            state.library = await invoke("lib_clear_history");
-            renderHomeTab();
-          }
-        }
+        if (what === "recap" || what === "liked") pushRoute({ type: what });
+        else if (what === "audiolab") openSettings("audio_lab", null);
+        else if (what === "settings") openSettings();
       };
     });
   }
@@ -4091,11 +4476,11 @@
     $("ctx-play-now").onclick = () => playSong(song);
     $("ctx-play-next").onclick = () => {
       state.queue.splice(state.currentIndex + 1, 0, song);
-      if (state.rightPaneOpen && ["queue", "randomize", "repeat"].includes(state.rightPaneTab)) renderRightPane();
+      if (state.rightPaneOpen && state.rightPaneTab === "queue") renderRightPane();
     };
     $("ctx-add-queue").onclick = () => {
       state.queue.push(song);
-      if (state.rightPaneOpen && ["queue", "randomize", "repeat"].includes(state.rightPaneTab)) renderRightPane();
+      if (state.rightPaneOpen && state.rightPaneTab === "queue") renderRightPane();
     };
     $("ctx-toggle-like").onclick = async () => {
       state.library = await invoke("lib_toggle_like", { song });
@@ -4193,7 +4578,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Settings Application, Audio Lab Effects & Two-Pane Settings Modal
+  // Settings Application, Audio Lab Effects & the Settings Page
   // --------------------------------------------------------------------------
   function applyAllSettingsEffects() {
     const prefs = window.MochySettingsUI?.ensurePrefsOnSettings(state.settings);
@@ -4221,57 +4606,118 @@
     if (state.rightPaneOpen) renderRightPane();
   }
 
-  function openSettingsModal(initialCat = null, initialSub = null) {
-    if (!window.MochySettingsUI) return;
-    window.MochySettingsUI.open(
-      {
-        invoke,
-        showError,
-        getSettings: () => state.settings,
-        getProviders: () => state.providers,
-        getDeviceName: () => state.deviceName,
-        applyAllEffects: applyAllSettingsEffects,
-        saveSettings: async () => {
-          const res = await invoke("settings_update", { settings: state.settings });
-          if (Array.isArray(res)) {
-            state.settings = res[0];
-            state.providers = res[1];
-          }
-        },
-        testCrossmix: () => audio.previewFilterSweep(),
-        onProfileChange: () => {
-          renderSidebar();
-          syncHeroCards();
-        },
-        onHomeRefresh: () => renderHomeTab(),
-        onHeroAutoChange: () => scheduleHeroAutoAdvance(),
-        onClearHistory: async () => {
-          state.library = await invoke("lib_clear_history");
-          renderHomeTab();
-        },
-        onImportedBackup: async (newSettings, newSnap) => {
-          state.settings = { ...state.settings, ...(newSettings || {}) };
-          state.library = newSnap || state.library;
-          applyAllSettingsEffects();
-          renderSidebar();
-          renderHomeTab();
-        },
-        getDiagnosticsText: () => {
-          const cur = state.currentSong;
-          const m = state.currentStreamMeta;
-          const pb = state.settings.prefs?.audioLab;
-          return [
-            `Track: ${cur ? `${cur.title} (${cur.id})` : "None"}`,
-            `Source: ${cur?.source || "youtube"} | Codec: ${m?.formatLabel || m?.codec || "N/A"}`,
-            `Bitrate: ${m?.bitrate ? `${Math.round(m.bitrate / 1000)} kbps` : "N/A"} | Loudness: ${m?.loudnessDb ?? "N/A"} dB`,
-            `Quality tier: ${state.settings.audioQuality || "auto"} | Speed: ${(pb?.playback?.speed || 1).toFixed(2)}x`,
-            `EQ enabled: ${!!pb?.eq?.enabled} (${pb?.eq?.presetId || "custom"}) | Transition: ${pb?.crossmix?.mode || "CROSSMIX"} (${pb?.crossmix?.style || "AUTO"})`
-          ].join("\n");
+  // settings floats over whatever is showing, so closing it lands you right back where you were
+  function openSettings(initialCat = null, initialSub = null) {
+    window.MochySettingsUI?.open(settingsContext(), initialCat, initialSub);
+  }
+
+  function settingsContext() {
+    return {
+      invoke,
+      showError,
+      getSettings: () => state.settings,
+      getProviders: () => state.providers,
+      getDeviceName: () => state.deviceName,
+      applyAllEffects: applyAllSettingsEffects,
+      saveSettings: async () => {
+        const res = await invoke("settings_update", { settings: state.settings });
+        if (Array.isArray(res)) {
+          state.settings = res[0];
+          state.providers = res[1];
         }
       },
-      initialCat,
-      initialSub
-    );
+      onHomeRefresh: () => renderHomeTab(),
+      onHeroAutoChange: () => scheduleHeroAutoAdvance(),
+      onImportedBackup: async (newSettings, newSnap) => {
+        state.settings = { ...state.settings, ...(newSettings || {}) };
+        state.library = newSnap || state.library;
+        applyAllSettingsEffects();
+        renderSidebar();
+        renderHomeTab();
+      },
+      getDiagnosticsText: () => {
+        const cur = state.currentSong;
+        const m = state.currentStreamMeta;
+        const eq = state.settings.prefs?.audioLab?.eq;
+        return [
+          `Track: ${cur ? `${cur.title} (${cur.id})` : "None"}`,
+          `Source: ${cur?.source || "youtube"} | Codec: ${m?.formatLabel || m?.codec || "N/A"}`,
+          `Bitrate: ${m?.bitrate ? `${Math.round(m.bitrate / 1000)} kbps` : "N/A"} | Loudness: ${m?.loudnessDb ?? "N/A"} dB`,
+          `Quality tier: ${state.settings.audioQuality || "auto"} | Even out songs: ${!!state.settings.normalizeVolume}`,
+          `EQ enabled: ${!!eq?.enabled} (${eq?.presetId || "custom"})`
+        ].join("\n");
+      }
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // The player as a paired phone steers it, and as remote.js hands a queue over
+  // --------------------------------------------------------------------------
+  function linkPlayer() {
+    return {
+      snapshot: () => ({
+        song: state.currentSong || null,
+        playing: !!state.isPlaying,
+        position: state.currentTime || 0,
+        duration: state.duration || 0,
+        index: state.currentIndex || 0,
+        upNext: state.queue.slice(state.currentIndex + 1, state.currentIndex + 26),
+        liked: !!state.currentSong && isLiked(state.currentSong.id)
+      }),
+      isPlaying: () => !!state.isPlaying,
+      handOverQueue: () => ({ songs: state.queue.slice(), index: state.currentIndex, position: state.currentTime || 0 }),
+      playQueue: async (songs, index, position) => {
+        const at = Math.max(0, Math.min(index, songs.length - 1));
+        await playSong(songs[at], songs, at, { here: true });
+        if (position > 1 && state.currentSong?.id === songs[at].id) {
+          audio.currentTime = position;
+          state.currentTime = position;
+          updateSeekBarsOnly();
+        }
+      },
+      playNext: (songs) => insertIntoQueue(songs, state.currentIndex + 1),
+      addToQueue: (songs) => insertIntoQueue(songs, state.queue.length),
+      jump: (index) => {
+        if (index < 0 || index >= state.queue.length) return;
+        state.currentIndex = index;
+        loadAndPlayCurrent(true);
+      },
+      remove: (index) => {
+        if (index <= state.currentIndex || index >= state.queue.length) return;
+        const removed = state.queue.splice(index, 1)[0];
+        state.unshuffledQueue = state.unshuffledQueue.filter((s) => s.id !== removed?.id);
+        if (state.rightPaneOpen && state.rightPaneTab === "queue") renderRightPane();
+      },
+      toggle: () => togglePlayPause(),
+      pause: () => {
+        if (!audio.paused) audio.pause();
+      },
+      next: () => playNext(),
+      previous: () => playPrevious(),
+      seek: (secs) => {
+        const dur = state.duration || audio.duration || 0;
+        if (dur) seekToFraction(secs / dur);
+      },
+      like: async () => {
+        if (!state.currentSong) return;
+        state.library = await invoke("lib_toggle_like", { song: state.currentSong });
+        renderSidebar();
+        renderAllPlayerSurfaces();
+      }
+    };
+  }
+
+  // songs a phone lined up go in after the current one or at the end; with nothing queued they just play
+  function insertIntoQueue(songs, at) {
+    if (!songs.length) return;
+    if (!state.queue.length) {
+      playSong(songs[0], songs, 0, { here: true });
+      return;
+    }
+    state.queue.splice(at, 0, ...songs);
+    state.unshuffledQueue.push(...songs);
+    if (state.rightPaneOpen && state.rightPaneTab === "queue") renderRightPane();
+    saveSessionQuiet();
   }
 
   // --------------------------------------------------------------------------
@@ -4280,7 +4726,7 @@
   function onMenuAction(id) {
     switch (id) {
       case "settings":
-        return openSettingsModal();
+        return openSettings();
       case "new-playlist":
         return promptNewPlaylist();
       case "play-pause":
@@ -4294,9 +4740,9 @@
       case "volume-down":
         return setVolume(state.volume - 0.08);
       case "shuffle":
-        return onRightPaneButtonTap("randomize");
+        return toggleShuffleMode();
       case "repeat":
-        return onRightPaneButtonTap("repeat");
+        return cycleRepeatMode();
       case "lyrics":
         return onRightPaneButtonTap("lyrics");
       case "player":
@@ -4308,7 +4754,8 @@
         return switchTab("home");
       case "search":
         if (state.showFullPlayer) toggleFullPlayer();
-        return switchTab("search");
+        switchTab("search");
+        return $("search-input")?.focus();
       case "library":
         if (state.showFullPlayer) toggleFullPlayer();
         return switchTab("library");
@@ -4323,6 +4770,7 @@
 
     if (e.key === "Escape") {
       closeAllOverlays();
+      if (window.MochySettingsUI?.close()) return;
       if (state.showFullPlayer) return toggleFullPlayer();
       if (state.routeStack.length) return popRoute();
       return;
@@ -4341,6 +4789,7 @@
     if (k === "f") {
       e.preventDefault();
       switchTab("search");
+      $("search-input")?.focus();
     } else if (e.key === "1") {
       e.preventDefault();
       switchTab("home");
@@ -4376,13 +4825,13 @@
       setVolume(state.volume - 0.08);
     } else if (e.key === ",") {
       e.preventDefault();
-      openSettingsModal();
+      openSettings();
     } else if (k === "r") {
       e.preventDefault();
-      onRightPaneButtonTap("repeat");
+      cycleRepeatMode();
     } else if (e.altKey && k === "s") {
       e.preventDefault();
-      onRightPaneButtonTap("randomize");
+      toggleShuffleMode();
     }
   });
 
@@ -4390,23 +4839,35 @@
   // App Initialization
   // --------------------------------------------------------------------------
   async function bootstrap() {
+    window.MochyShelves.init({
+      esc,
+      proxyImg,
+      sizedCover,
+      songThumb,
+      artistNames,
+      playingBarsHtml,
+      itemCardHtml: renderItemCardHtml,
+      icons: ICONS,
+      nowPlaying: () => ({ id: state.currentSong?.id, playing: state.isPlaying })
+    });
     try {
-      state.userSidebarCollapsed = localStorage.getItem("mochy.sidebarCollapsed") === "1";
+      state.userSidebarCollapsed = localStorage.getItem("mochy.sidebarCollapsed") !== "0";
     } catch (_) {}
 
     $("back-button").innerHTML = ICONS.arrowLeft;
     $("back-button").onclick = () => popRoute();
+    $("corner-home-btn").innerHTML = ICONS.mochy;
+    $("corner-home-btn").onclick = () => switchTab("home");
+    $("sidebar-toggle-btn").onclick = () => toggleSidebar();
+    syncShellLayout();
     $("error-toast-close").onclick = () => $("error-toast").classList.add("hidden");
-    $("right-pane-scrim").onclick = () => {
-      state.rightPaneOpen = false;
-      syncShellLayout();
-      renderTopBar();
-    };
+    $("right-pane-scrim").onclick = () => closeRightPane();
 
     try {
       const init = await invoke("app_init");
       state.proxyPort = init.proxyPort;
       state.platform = init.platform || "macos";
+      state.userName = init.userName || "";
       state.deviceName = init.deviceName || "";
       state.library = init.library || state.library;
       state.settings = { ...state.settings, ...(init.settings || {}) };
@@ -4459,6 +4920,32 @@
     requestAnimationFrame(tickFrame);
 
     tauriListen("menu", onMenuAction);
+
+    // paired devices: the settings page, the remote both ways, and what a sync or a phone changes here
+    window.MochyDevices?.init({ invoke, listen: tauriListen, showError });
+    window.MochyRemote?.init({
+      invoke,
+      listen: tauriListen,
+      showError,
+      cover: (url, size) => proxyImg(sizedCover(url, size)),
+      player: linkPlayer()
+    });
+    tauriListen("library://changed", async () => {
+      try {
+        state.library = await invoke("lib_snapshot");
+      } catch (_) {
+        return;
+      }
+      renderSidebar();
+      if (state.tab === "library" && !state.routeStack.length) renderLibraryTab();
+    });
+    tauriListen("settings://changed", (saved) => {
+      if (!saved) return;
+      state.settings = { ...state.settings, ...saved };
+      window.MochySettingsUI?.ensurePrefsOnSettings(state.settings);
+      applyAllSettingsEffects();
+      renderAllPlayerSurfaces();
+    });
 
     let resizeTimer = null;
     window.addEventListener("resize", () => {

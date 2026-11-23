@@ -52,6 +52,8 @@ pub struct InitData {
     pub session: Option<PlayerSession>,
     pub device_id: String,
     pub device_name: String,
+    // the first name on this computer's account, for the home page's hello
+    pub user_name: String,
 }
 
 #[tauri::command]
@@ -75,7 +77,15 @@ async fn app_init(state: State<'_, AppState>) -> Result<InitData, String> {
         session,
         device_id: state.link.id().to_string(),
         device_name: state.link.name().await,
+        user_name: first_name(),
     })
+}
+
+fn first_name() -> String {
+    whoami::realname()
+        .ok()
+        .and_then(|name| name.split_whitespace().next().map(str::to_string))
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -213,6 +223,11 @@ async fn yt_browse_section(
         .innertube
         .browse_section(&browse_id, params.as_deref())
         .await
+}
+
+#[tauri::command]
+async fn yt_moods(state: State<'_, AppState>) -> Result<Vec<MoodSection>, String> {
+    state.innertube.moods_and_genres().await
 }
 
 #[tauri::command]
@@ -705,7 +720,7 @@ async fn cover_palette(state: State<'_, AppState>, url: String) -> Result<Option
     } else if let Some(rest) = url.strip_prefix("link-art:") {
         let (device, file) = rest.split_once(':').unwrap_or((rest, ""));
         match state.link.file_url(device, &format!("/art/{}", file)).await {
-            Some((u, key)) => match state.link.stream_client().get(u).header("X-Mochy-Key", key).send().await {
+            Some(u) => match state.link.stream_client().get(u).send().await {
                 Ok(r) => r.bytes().await.ok().map(|b| b.to_vec()),
                 Err(_) => None,
             },
@@ -781,6 +796,7 @@ fn main() {
             yt_playlist,
             yt_playlist_continuation,
             yt_browse_section,
+            yt_moods,
             yt_next,
             yt_stream,
             lyrics_get,

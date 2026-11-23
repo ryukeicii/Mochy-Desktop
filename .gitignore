@@ -1,6 +1,9 @@
 # rust build output, several gigs and rebuilt by cargo
 target/
 
+# packaged release installers and binaries (.dmg, .exe, etc.)
+dist/
+
 # tauri regenerates these capability schemas on every build
 src-tauri/gen/schemas/
 

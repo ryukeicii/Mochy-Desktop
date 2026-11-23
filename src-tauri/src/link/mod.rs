@@ -1,6 +1,7 @@
 // mochy link on the desktop: the same wi-fi protocol the android app speaks, so a phone and this computer can pair,
 // steer each other, keep their libraries in step and stream each other's song files (flac included)
 
+pub mod auth;
 pub mod http;
 pub mod mdns;
 pub mod snapshot;
@@ -22,7 +23,8 @@ use tokio::sync::{Mutex, RwLock};
 
 pub const LINK_PORT: u16 = 47801;
 pub const PAIR_PORT: u16 = 47802;
-pub const PROTOCOL: i64 = 1;
+// 2 signs every call and pairs without sending the key, the same as the phone since 2026-11-12
+pub const PROTOCOL: i64 = 2;
 pub const KIND: &str = "desktop";
 const MAX_DEVICES: usize = 10;
 const MAX_WRONG_TRIES: u32 = 5;
@@ -240,6 +242,7 @@ pub struct LinkHub {
     syncing: Mutex<HashSet<String>>,
     revision: AtomicI64,
     controller: RwLock<Option<(String, i64)>>,
+    verifier: std::sync::Mutex<auth::Verifier>,
     // the device's library sum at its last good sync, to tell whether there's anything new to pull
     synced_lib: RwLock<HashMap<String, String>>,
     client: reqwest::Client,
@@ -304,14 +307,25 @@ fn host_label(id: &str) -> String {
     format!("mochy-{}", id.chars().filter(|c| c.is_ascii_alphanumeric()).take(8).collect::<String>())
 }
 
+// where a device loads this computer's covers from: each link signed for it, since an image loader sends no headers of ours
+pub struct ArtLinks {
+    base: String,
+    device: String,
+    key: String,
+}
+
+impl ArtLinks {
+    fn link(&self, art_id: &str) -> String {
+        let path = format!("/art/{}", art_id);
+        let signed = auth::signed_query(&self.device, &self.key, &path, now_ms() + auth::LINK_GOOD_FOR_MS);
+        format!("{}{}?{}", self.base, path, signed)
+    }
+}
+
 // a song as the phone hands it over: enough to show it and to find it on youtube
-pub fn song_to_wire(song: &SongItem, art_base: Option<&str>) -> Value {
+pub fn song_to_wire(song: &SongItem, art: Option<&ArtLinks>) -> Value {
     let thumbnail = if let Some(id) = song.thumbnail.strip_prefix("local-art:") {
-        // art_base already ends in "?k=<key>" for the device asking, the same way its streams carry the key
-        art_base
-            .and_then(|base| base.split_once('?').map(|(b, q)| format!("{}/art/{}?{}", b, id, q)))
-            .map(Value::String)
-            .unwrap_or(Value::Null)
+        art.map(|a| Value::String(a.link(id))).unwrap_or(Value::Null)
     } else if song.thumbnail.is_empty() {
         Value::Null
     } else {
@@ -406,6 +420,7 @@ impl LinkHub {
             syncing: Mutex::new(HashSet::new()),
             revision: AtomicI64::new(now_ms()),
             controller: RwLock::new(None),
+            verifier: std::sync::Mutex::new(auth::Verifier::default()),
             synced_lib: RwLock::new(HashMap::new()),
             client,
             slow,
@@ -608,7 +623,7 @@ impl LinkHub {
         *self.mirror.write().await = (mirror, now_ms());
     }
 
-    async fn now_json(&self, art_base: Option<&str>) -> Value {
+    async fn now_json(&self, art: Option<&ArtLinks>) -> Value {
         let (mirror, read_at) = self.mirror.read().await.clone();
         let moved = if mirror.playing { (now_ms() - read_at) as f64 / 1000.0 } else { 0.0 };
         let position = if mirror.duration > 0.0 { (mirror.position + moved).min(mirror.duration) } else { mirror.position + moved };
@@ -617,7 +632,7 @@ impl LinkHub {
             .iter()
             .take(25)
             .enumerate()
-            .map(|(i, s)| json!({ "index": mirror.index + 1 + i, "song": song_to_wire(s, art_base) }))
+            .map(|(i, s)| json!({ "index": mirror.index + 1 + i, "song": song_to_wire(s, art) }))
             .collect();
         let mut out = json!({
             "playing": mirror.playing,
@@ -630,20 +645,39 @@ impl LinkHub {
             "styles": [],
         });
         if let Some(song) = &mirror.song {
-            out["song"] = song_to_wire(song, art_base);
+            out["song"] = song_to_wire(song, art);
         }
         out
     }
 
     // ---------------------------------------------------------------- the server
 
-    async fn device_by_key(&self, key: Option<&str>) -> Option<PairedDevice> {
-        let key = key?;
-        self.store.read().await.devices.iter().find(|d| http::equal_secret(&d.key, key)).cloned()
+    // the paired device that signed this call, none when the signature doesn't check out against any key
+    async fn device_for(&self, req: &Request) -> Option<PairedDevice> {
+        let store = self.store.read().await;
+        let key_of = |id: &str| store.devices.iter().find(|d| d.id == id).map(|d| d.key.clone());
+        let id = self.verifier.lock().ok()?.verify(req, key_of)?;
+        store.devices.iter().find(|d| d.id == id).cloned()
+    }
+
+    // a call to a paired device, signed with the key both sides worked out at pairing; a post when there's a body
+    fn signed(&self, client: &reqwest::Client, url: String, key: &str, body: Option<&Value>) -> reqwest::RequestBuilder {
+        let bytes = body.map(|b| serde_json::to_vec(b).unwrap_or_default());
+        let method = if bytes.is_some() { "POST" } else { "GET" };
+        let header = auth::header(&self.me, key, method, &url, bytes.as_deref().unwrap_or_default());
+        let request = match bytes {
+            Some(b) => client.post(url).header("Content-Type", "application/json; charset=utf-8").body(b),
+            None => client.get(url),
+        };
+        request.header(auth::HEADER, header)
     }
 
     async fn route(self: Arc<Self>, req: Request) -> Response {
-        let Some(device) = self.device_by_key(req.key()).await else {
+        // a device still on the old protocol sends its key in a header; told to update rather than unpaired, which made it forget this computer
+        if req.header(auth::OLD_KEY_HEADER).is_some() {
+            return Response::status(426, "update mochy on that device");
+        }
+        let Some(device) = self.device_for(&req).await else {
             return Response::status(401, "not paired");
         };
         self.seen(&device.id).await;
@@ -727,9 +761,9 @@ impl LinkHub {
         }
         self.note_controller(&device.name).await;
         let body = req.json();
-        let art_base = self.art_base(device).await;
+        let art = self.art_links(device).await;
         match req.path.as_str() {
-            "/now" => Response::json(&self.now_json(art_base.as_deref()).await),
+            "/now" => Response::json(&self.now_json(art.as_ref()).await),
             "/play" => {
                 let songs = self.songs_for(device, body.get("songs")).await;
                 if songs.is_empty() {
@@ -786,11 +820,10 @@ impl LinkHub {
         }
     }
 
-    // where a device can load this computer's cover art from
-    async fn art_base(&self, device: &PairedDevice) -> Option<String> {
+    async fn art_links(&self, device: &PairedDevice) -> Option<ArtLinks> {
         let address = local_address()?;
         let port = self.port().await;
-        Some(format!("{}?k={}", base_url(&address, port), device.key))
+        Some(ArtLinks { base: base_url(&address, port), device: device.id.clone(), key: device.key.clone() })
     }
 
     // songs sent over the wire, with the ones that only live on that device marked as streaming from it
@@ -1021,13 +1054,7 @@ impl LinkHub {
     // a phone hears about it straight away; this side forgets the device either way
     pub async fn unlink(&self, id: &str) {
         if let Some(live) = self.live_device(id).await {
-            let _ = self
-                .client
-                .post(format!("{}/unlink", live.base()))
-                .header(http::KEY_HEADER, &live.key)
-                .json(&json!({}))
-                .send()
-                .await;
+            let _ = self.signed(&self.client, format!("{}/unlink", live.base()), &live.key, Some(&json!({}))).send().await;
         }
         self.forget(id).await;
     }
@@ -1102,7 +1129,7 @@ impl LinkHub {
     async fn on_pair(self: &Arc<Self>, req: &Request) -> Response {
         let body = req.json();
         let given = body.get("code").and_then(|v| v.as_str()).unwrap_or_default().trim().to_string();
-        {
+        let code = {
             let mut slot = self.pairing.lock().await;
             let Some(pairing) = slot.as_mut() else { return Response::status(409, "not pairing") };
             if !http::equal_secret(&given, &pairing.code) {
@@ -1116,12 +1143,14 @@ impl LinkHub {
                 }
                 return Response::status(403, "wrong code");
             }
-        }
+            pairing.code.clone()
+        };
         let Some(id) = body.get("phoneId").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(str::to_string) else {
             return Response::status(400, "");
         };
-        let Some(key) = body.get("key").and_then(|v| v.as_str()).filter(|s| s.len() >= 16).map(str::to_string) else {
-            return Response::status(400, "");
+        // a device on the old protocol sends the key itself instead of a public half; it has to update first
+        let Some(other_public) = body.get("pub").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) else {
+            return Response::status(426, "update mochy on the other device");
         };
         {
             let store = self.store.read().await;
@@ -1129,6 +1158,11 @@ impl LinkHub {
                 return Response::status(409, "full");
             }
         }
+        // the key is worked out from its public half, ours and the code; ours goes back in the reply
+        let Some((private, public)) = auth::new_key_pair() else { return Response::status(500, "") };
+        let Some(key) = auth::shared_key(private, other_public, &code, &[&id, &self.me]) else {
+            return Response::status(400, "");
+        };
         let now = now_ms();
         let host = req.remote_host();
         let port = body.get("port").and_then(|v| v.as_u64()).map(|p| p as u16).filter(|p| *p > 0).unwrap_or(LINK_PORT);
@@ -1169,6 +1203,7 @@ impl LinkHub {
             "tvName": self.name().await,
             "kind": KIND,
             "port": self.port().await,
+            "pub": public,
         }))
     }
 
@@ -1214,7 +1249,8 @@ impl LinkHub {
                 return Err("This computer already has 10 devices".into());
             }
         }
-        let key = random_hex(24);
+        // only this computer's public half goes over; the key both sides use is worked out from the two halves and the code
+        let (private, public) = auth::new_key_pair().ok_or("Couldn't get ready to pair. Try again.")?;
         let name = self.name().await;
         let user = self.library.get_settings().await.profile_name;
         let response = self
@@ -1228,7 +1264,7 @@ impl LinkHub {
                 "userName": user,
                 "hasAvatar": false,
                 "port": link_port,
-                "key": key,
+                "pub": public,
                 "protocol": PROTOCOL,
             }))
             .send()
@@ -1238,7 +1274,8 @@ impl LinkHub {
         let text = response.text().await.unwrap_or_default();
         match status {
             200 => {}
-            403 => return Err("That code isn't right".into()),
+            403 => return Err("That code didn't match. Check the other screen and try again.".into()),
+            426 => return Err(format!("{} runs an older Mochy. Update it, then try the code again.", peer.name)),
             409 if text == "full" => return Err(format!("{} already has all the devices it takes", peer.name)),
             _ => return Err(format!("Couldn't pair with {}", peer.name)),
         }
@@ -1247,6 +1284,13 @@ impl LinkHub {
         let id = reply.get("tvId").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or(&peer.id).to_string();
         let kind = reply.get("kind").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or(&peer.kind).to_string();
         let port = reply.get("port").and_then(|v| v.as_u64()).map(|p| p as u16).filter(|p| *p > 0).unwrap_or(LINK_PORT);
+        // a device on the old protocol sends no public half back; it has to update before it can pair
+        let other_public = reply
+            .get("pub")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| format!("{} runs an older Mochy. Update it, then try the code again.", peer.name))?;
+        let key = auth::shared_key(private, other_public, &code, &[&self.me, &id]).ok_or_else(|| format!("Couldn't pair with {}", peer.name))?;
         let device = PairedDevice {
             id: id.clone(),
             name: reply.get("tvName").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or(&peer.name).to_string(),
@@ -1333,7 +1377,7 @@ impl LinkHub {
         }
         for (host, port) in targets {
             let url = format!("{}/hello?port={}&kind={}", base_url(&host, port), my_port, KIND);
-            match self.client.get(&url).header(http::KEY_HEADER, &device.key).timeout(Duration::from_secs(6)).send().await {
+            match self.signed(&self.client, url, &device.key, None).timeout(Duration::from_secs(6)).send().await {
                 Ok(r) if r.status().as_u16() == 200 => {
                     let hello: Value = r.json().await.unwrap_or(Value::Null);
                     self.mark_live(id, &host, port, Some(&hello)).await;
@@ -1426,7 +1470,7 @@ impl LinkHub {
             let extra = if first { self.library.all_liked().await } else { Vec::new() };
             if !entries.is_empty() || !extra.is_empty() {
                 let body = snapshot::changes_body(&entries, &songs, &extra);
-                let sent = self.client.post(format!("{}/changes", base)).header(http::KEY_HEADER, &live.key).json(&body).send().await;
+                let sent = self.signed(&self.client, format!("{}/changes", base), &live.key, Some(&body)).send().await;
                 match sent {
                     Ok(r) if r.status().is_success() => {
                         summary.push(format!("sent {} changes", entries.len() + extra.len()));
@@ -1439,7 +1483,7 @@ impl LinkHub {
 
             let events_since = device.events_mark.max(now_ms() - 120 * 86_400_000);
             let remote = if device.kind == KIND {
-                let r = self.slow.get(format!("{}/library.json", base)).header(http::KEY_HEADER, &live.key).send().await.map_err(|e| e.to_string())?;
+                let r = self.signed(&self.slow, format!("{}/library.json", base), &live.key, None).send().await.map_err(|e| e.to_string())?;
                 if r.status().as_u16() == 403 {
                     None
                 } else {
@@ -1447,7 +1491,7 @@ impl LinkHub {
                     Some(snapshot::read_json(&v, id))
                 }
             } else {
-                let r = self.slow.get(format!("{}/library", base)).header(http::KEY_HEADER, &live.key).send().await.map_err(|e| e.to_string())?;
+                let r = self.signed(&self.slow, format!("{}/library", base), &live.key, None).send().await.map_err(|e| e.to_string())?;
                 if r.status().as_u16() == 403 {
                     None
                 } else if !r.status().is_success() {
@@ -1510,7 +1554,7 @@ impl LinkHub {
 
     // the song files the device can hand over, named from its library when there is one
     async fn pull_files(&self, id: &str, base: &str, key: &str, songs: Option<&HashMap<String, SongItem>>) {
-        let Ok(r) = self.client.get(format!("{}/files", base)).header(http::KEY_HEADER, key).send().await else { return };
+        let Ok(r) = self.signed(&self.client, format!("{}/files", base), key, None).send().await else { return };
         let Ok(list) = r.json::<Vec<Value>>().await else { return };
         let known: HashMap<String, SongItem> = match songs {
             Some(s) => s.clone(),
@@ -1548,10 +1592,11 @@ impl LinkHub {
         self.changed();
     }
 
-    // where the local proxy fetches a device's file or cover from
-    pub async fn file_url(&self, device_id: &str, path: &str) -> Option<(String, String)> {
+    // where the local proxy fetches a device's file or cover from, signed in the query the way a player's link is
+    pub async fn file_url(&self, device_id: &str, path: &str) -> Option<String> {
         let live = self.live_device(device_id).await?;
-        Some((format!("{}{}", live.base(), path), live.key))
+        let signed = auth::signed_query(&self.me, &live.key, &http::percent_decode_path(path), now_ms() + auth::LINK_GOOD_FOR_MS);
+        Some(format!("{}{}?{}", live.base(), path, signed))
     }
 
     pub fn stream_client(&self) -> &reqwest::Client {
@@ -1602,11 +1647,12 @@ impl LinkHub {
         let target = self.remote.read().await.as_ref().map(|r| (r.id.clone(), r.name.clone())).ok_or("Not steering anything")?;
         let live = self.live_device(&target.0).await.ok_or_else(|| format!("{} isn't around", target.1))?;
         let url = format!("{}{}", live.base(), path);
-        let request = match body {
-            Some(b) => self.client.post(url).json(&b),
-            None => self.client.get(url),
-        };
-        let r = request.header(http::KEY_HEADER, &live.key).timeout(Duration::from_secs(8)).send().await.map_err(|_| format!("Couldn't reach {}", target.1))?;
+        let r = self
+            .signed(&self.client, url, &live.key, body.as_ref())
+            .timeout(Duration::from_secs(8))
+            .send()
+            .await
+            .map_err(|_| format!("Couldn't reach {}", target.1))?;
         let status = r.status().as_u16();
         let text = r.text().await.unwrap_or_default();
         match status {

@@ -30,6 +30,8 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 lofty = "0.25.5"
 tauri-plugin-dialog = "2"
 if-addrs = "0.15"
+# already built for rustls; the link's pairing and signed calls use its ecdh, hmac and sha-256
+ring = { version = "0.17", default-features = false, features = ["alloc"] }
 
 [profile.release]
 panic = "abort"

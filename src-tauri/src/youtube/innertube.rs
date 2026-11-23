@@ -1,6 +1,7 @@
 use crate::youtube::client::YouTubeClient;
 use crate::youtube::json::Json;
 use crate::youtube::models::*;
+use crate::youtube::proxy;
 use crate::youtube::renderers;
 use base64::Engine;
 use regex::Regex;
@@ -13,6 +14,7 @@ use tokio::sync::RwLock;
 
 pub struct InnerTube {
     pub http: Client,
+    pub stream_http: Client,
     visitor_data: RwLock<Option<String>>,
     stream_cache: RwLock<HashMap<String, StreamInfo>>,
     proxy_port: RwLock<u16>,
@@ -21,11 +23,18 @@ pub struct InnerTube {
 impl InnerTube {
     pub fn new() -> Arc<Self> {
         let http = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
+        let stream_http = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(30))
+            .build()
+            .expect("Failed to create stream HTTP client");
         Arc::new(Self {
             http,
+            stream_http,
             visitor_data: RwLock::new(None),
             stream_cache: RwLock::new(HashMap::new()),
             proxy_port: RwLock::new(0),
@@ -751,6 +760,56 @@ impl InnerTube {
         Ok(items)
     }
 
+    // the moods & genres page search opens on: each grid's title and its tiles
+    pub async fn moods_and_genres(&self) -> Result<Vec<MoodSection>, String> {
+        self.ensure_visitor_data().await;
+        let response = self
+            .post(
+                "browse",
+                &YouTubeClient::WEB_REMIX,
+                json!({ "browseId": "FEmusic_moods_and_genres" }),
+                &[],
+            )
+            .await?;
+        let contents = response
+            .get("contents")
+            .get("singleColumnBrowseResultsRenderer")
+            .get("tabs")
+            .at(0)
+            .get("tabRenderer")
+            .get("content")
+            .get("sectionListRenderer")
+            .get("contents");
+        let sections = contents
+            .array()
+            .into_iter()
+            .filter_map(|content| {
+                let grid = content.get("gridRenderer");
+                let title = grid
+                    .get("header")
+                    .get("gridHeaderRenderer")
+                    .get("title")
+                    .text()?;
+                let items: Vec<MoodItem> = grid
+                    .get("items")
+                    .children("musicNavigationButtonRenderer")
+                    .into_iter()
+                    .filter_map(|button| {
+                        let endpoint = button.get("clickCommand").get("browseEndpoint");
+                        Some(MoodItem {
+                            title: button.get("buttonText").text()?,
+                            stripe_color: button.get("solid").get("leftStripeColor").int(),
+                            browse_id: endpoint.get("browseId").string()?,
+                            params: endpoint.get("params").string(),
+                        })
+                    })
+                    .collect();
+                (!items.is_empty()).then_some(MoodSection { title, items })
+            })
+            .collect();
+        Ok(sections)
+    }
+
     pub fn next<'a>(
         &'a self,
         endpoint: WatchEndpoint,
@@ -933,51 +992,41 @@ impl InnerTube {
         let port = self.get_proxy_port().await;
 
         for client in &clients {
-            let response = match self
-                .post(
-                    "player",
-                    client,
-                    json!({
-                        "videoId": video_id,
-                        "contentCheckOk": true,
-                        "racyCheckOk": true,
-                    }),
-                    &[],
-                )
-                .await
-            {
+            let mut answer = self.player(client, video_id).await;
+            // a bot check usually clears with a fresh visitor id, and it's worth one more ask since only visionos links play to the end
+            if matches!(&answer, Err(reason) if reason.contains("not a bot")) {
+                self.reset_visitor_data().await;
+                self.ensure_visitor_data().await;
+                answer = self.player(client, video_id).await;
+            }
+            let response = match answer {
                 Ok(r) => r,
-                Err(e) => {
-                    reasons.push(format!("{}: {}", client.name, e));
+                Err(reason) => {
+                    reasons.push(format!("{}: {}", client.name, reason));
                     continue;
                 }
             };
 
-            let status = response
-                .get("playabilityStatus")
-                .get("status")
-                .string()
-                .unwrap_or_else(|| "UNKNOWN".to_string());
-            if status != "OK" {
-                let reason = response
-                    .get("playabilityStatus")
-                    .get("reason")
-                    .string()
-                    .unwrap_or(status);
-                reasons.push(format!("{}: {}", client.name, reason));
+            let Some((mut info, size, init_end)) =
+                self.pick_stream(&response, client, prefer_high_quality, quality, video_id, port)
+            else {
+                reasons.push(format!("{}: no playable stream found", client.name));
+                continue;
+            };
+            let (whole, patched_init) = tokio::join!(
+                self.serves_whole_song(&info, size),
+                self.fetch_patched_init(&info, init_end)
+            );
+            if !whole {
+                reasons.push(format!("{}: only serves the start of the song", client.name));
                 continue;
             }
-
-            if let Some(info) =
-                self.pick_stream(&response, client, prefer_high_quality, quality, video_id, port)
-            {
-                self.stream_cache
-                    .write()
-                    .await
-                    .insert(video_id.to_string(), info.clone());
-                return Ok(info);
-            }
-            reasons.push(format!("{}: no playable stream found", client.name));
+            info.patched_init = patched_init;
+            self.stream_cache
+                .write()
+                .await
+                .insert(video_id.to_string(), info.clone());
+            return Ok(info);
         }
 
         self.reset_visitor_data().await;
@@ -1006,6 +1055,80 @@ impl InnerTube {
         n
     }
 
+    // one client's player answer, or youtube's reason when it won't play the song for that client
+    async fn player(&self, client: &YouTubeClient, video_id: &str) -> Result<Json, String> {
+        let response = self
+            .post(
+                "player",
+                client,
+                json!({
+                    "videoId": video_id,
+                    "contentCheckOk": true,
+                    "racyCheckOk": true,
+                }),
+                &[],
+            )
+            .await?;
+        let playability = response.get("playabilityStatus");
+        let status = playability.get("status").string().unwrap_or_else(|| "UNKNOWN".to_string());
+        if status != "OK" {
+            return Err(playability.get("reason").string().unwrap_or(status));
+        }
+        Ok(response)
+    }
+
+    // ipad links answer 403 past their first megabyte, and webkit then plays silence until the song's full length
+    async fn serves_whole_song(&self, info: &StreamInfo, size: Option<u64>) -> bool {
+        // without a size, ask well past that first megabyte, where a song shorter than that answers 416
+        let (byte, size_known) = match size {
+            Some(s) if s > 1 => (s - 1, true),
+            _ => (2 * 1024 * 1024, false),
+        };
+        let mut req = self
+            .http
+            .get(&info.url)
+            .header("Range", format!("bytes={}-{}", byte, byte))
+            .timeout(Duration::from_secs(8));
+        for (k, v) in &info.headers {
+            req = req.header(k, v);
+        }
+        match req.send().await {
+            Ok(resp) => resp.status().is_success() || (!size_known && resp.status().as_u16() == 416),
+            Err(_) => false,
+        }
+    }
+
+    // fetch the fMP4 init segment (ftyp + moov) and zero its header durations so CoreMedia doesn't double-count them
+    async fn fetch_patched_init(&self, info: &StreamInfo, init_end: Option<u64>) -> Option<Vec<u8>> {
+        if info.codec != "AAC" {
+            return None;
+        }
+        let end = init_end.filter(|&e| (32..=65_535).contains(&e)).unwrap_or(4095);
+        let mut req = self
+            .http
+            .get(&info.url)
+            .header("Range", format!("bytes=0-{}", end))
+            .timeout(Duration::from_secs(8));
+        for (k, v) in &info.headers {
+            req = req.header(k, v);
+        }
+        let resp = req.send().await.ok()?;
+        let status = resp.status().as_u16();
+        if status != 200 && status != 206 {
+            return None;
+        }
+        if status == 206 {
+            let cr = resp.headers().get("content-range")?.to_str().ok()?;
+            if !cr.trim().starts_with("bytes 0-") {
+                return None;
+            }
+        }
+        let mut buf = resp.bytes().await.ok()?.to_vec();
+        let moov_end = proxy::patch_fmp4_init(&mut buf)?;
+        buf.truncate(moov_end);
+        Some(buf)
+    }
+
     fn pick_stream(
         &self,
         response: &Json,
@@ -1014,7 +1137,7 @@ impl InnerTube {
         quality: Option<&str>,
         video_id: &str,
         proxy_port: u16,
-    ) -> Option<StreamInfo> {
+    ) -> Option<(StreamInfo, Option<u64>, Option<u64>)> {
         let streaming = response.get("streamingData");
         let lifetime = streaming.get("expiresInSeconds").int().unwrap_or(21_540);
         let now_unix = SystemTime::now()
@@ -1095,7 +1218,7 @@ impl InnerTube {
         };
         let proxy_url = format!("http://127.0.0.1:{}/stream/{}", proxy_port, video_id);
 
-        Some(StreamInfo {
+        let info = StreamInfo {
             url,
             proxy_url,
             headers: client.stream_headers(),
@@ -1107,7 +1230,15 @@ impl InnerTube {
             is_hls: false,
             approx_duration: format.get("approxDurationMs").double().map(|ms| ms / 1000.0),
             format_label,
-        })
+            patched_init: None,
+        };
+        let size = format.get("contentLength").int().and_then(|n| u64::try_from(n).ok());
+        let init_end = format
+            .get("initRange")
+            .get("end")
+            .int()
+            .and_then(|n| u64::try_from(n).ok());
+        Some((info, size, init_end))
     }
 
     pub async fn transcript(&self, video_id: &str) -> Result<Option<String>, String> {

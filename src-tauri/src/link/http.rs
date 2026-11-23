@@ -15,8 +15,6 @@ const MAX_HEAD: usize = 32 * 1024;
 const MAX_BODY: usize = 8 * 1024 * 1024;
 const READ_TIMEOUT: Duration = Duration::from_secs(15);
 
-pub const KEY_HEADER: &str = "x-mochy-key";
-
 // one request as the link server reads it: the path without its query, the query split up, headers in lowercase
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -31,11 +29,6 @@ pub struct Request {
 impl Request {
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(&name.to_ascii_lowercase()).map(|s| s.as_str())
-    }
-
-    // the key a paired device sends, in the header for api calls or the link itself for a song a player streams
-    pub fn key(&self) -> Option<&str> {
-        self.header(KEY_HEADER).or_else(|| self.query.get("k").map(|s| s.as_str()))
     }
 
     pub fn json(&self) -> serde_json::Value {
@@ -153,11 +146,12 @@ pub fn reason(status: u16) -> &'static str {
         404 => "Not Found",
         409 => "Conflict",
         416 => "Range Not Satisfiable",
+        426 => "Upgrade Required",
         _ => "Error",
     }
 }
 
-fn percent_decode_path(path: &str) -> String {
+pub fn percent_decode_path(path: &str) -> String {
     // paths keep '+' as a plus, only %xx is undone
     let bytes = path.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -319,6 +313,7 @@ pub async fn write_response(socket: &mut TcpStream, response: Response, is_head:
     Ok(())
 }
 
+// compared in constant time, so the length of a near miss gives nothing away
 pub fn equal_secret(a: &str, b: &str) -> bool {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     if a.len() != b.len() {
