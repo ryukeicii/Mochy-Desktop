@@ -4,6 +4,7 @@ mod library;
 mod link;
 mod local;
 mod lyrics;
+#[cfg(target_os = "macos")]
 mod menu;
 mod palette;
 mod youtube;
